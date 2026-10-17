@@ -1,0 +1,51 @@
+# Environment & Config
+.env
+.env.local
+*.local
+
+# Dependencies & Build
+node_modules/
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+
+# Rust / Tauri
+target/
+src-tauri/target/
+Cargo.lock
+
+# Python / Pip
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# Go
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Saga Cache & User Data
+data/
+downloads/
+cache/
+audio_cache/
+*.epub
+*.m4a
+*.mp3
+
+# Logs & OS artifacts
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
