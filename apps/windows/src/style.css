@@ -1,0 +1,35 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+
+  color-scheme: dark;
+  color: #e5e7eb;
+  background-color: #111827;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE/Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none !important; /* Chrome / Safari / Edge / WebView2 */
+  width: 0 !important;
+  height: 0 !important;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}

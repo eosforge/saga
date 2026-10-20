@@ -1,0 +1,126 @@
+{
+  "contract": "RET-01",
+  "date": "2026-10-19",
+  "status": "implemented; scoped automated checks passed; desktop interaction awaiting user review",
+  "authorization": "User approved the retain label, implementation, code/document cleanup, and subsequently requested correction of inaccurate conflict navigation.",
+  "behavior": [
+    "Retain changes review state only; titles, bodies, chapter numbers and order remain unchanged.",
+    "Pending and processed lists separate review workflow from structural validity. Persisted findings can be reopened from the shelf and revoked.",
+    "Content-bound decisions and edited sections commit atomically. Save failures remain visible and do not publish frontend state.",
+    "Reimport reuses matching decisions for the same book identity; changed content, context or positions invalidate stale keys.",
+    "Navigation uses section identity and targets its heading with a direct jump. Deleted sections do not fall back to a neighbor; undo uses the actual chapter position. Volume regression uses its true first section."
+  ],
+  "checks": [
+    {
+      "command": "cargo test --offline --locked -p protocol -p reader -p native",
+      "exit_code": 0,
+      "passed": 48,
+      "ignored": 2,
+      "log": "2026-10-19-retention-rust-verified.log"
+    },
+    {
+      "command": "SAGA_SAMPLE=<authorized path> cargo test --offline --locked -p native -p reader -- --ignored --nocapture",
+      "exit_code": 0,
+      "passed": 2,
+      "log": "2026-10-19-retention-sample-verified.log"
+    },
+    {
+      "command": "pnpm test",
+      "cwd": "apps/windows",
+      "exit_code": 0,
+      "passed": 14,
+      "log": "2026-10-19-retention-ui-verified.log"
+    },
+    {
+      "command": "pnpm build",
+      "cwd": "apps/windows",
+      "exit_code": 0,
+      "log": "2026-10-19-retention-build-delivery.log",
+      "warning": "Existing Vite mixed static/dynamic Tauri core import warning."
+    }
+  ],
+  "sample": {
+    "path": "D:\\texts\\修真聊天群.txt",
+    "bytes": 27432041,
+    "sha256": "ec1e5a5ee7e86bea3c21de123f8d3c851b44b7b05754d911fd406e733e6e5bd9",
+    "explicit_headings": 3165,
+    "sections": 3167,
+    "duplicate_numbers": [
+      2656,
+      2680
+    ],
+    "retained_in_isolated_test": 2,
+    "pending_in_isolated_test": 0,
+    "source_unchanged": true,
+    "test_database": "isolated in-memory SQLite; no writes to the live library"
+  },
+  "preserved_failures": [
+    "2026-10-19-retention-ui.log",
+    "2026-10-19-retention-build.log",
+    "2026-10-19-retention-rust-final.log"
+  ],
+  "limitations": [
+    "Frontend handler tests use mocked IPC and DOM scroll targets; actual Windows window interaction and pixel-level positioning await user review.",
+    "The additive reviews table is initialized on normal application database access. Existing books were not automatically marked retained.",
+    "No formal intensive-development gate, exhaustive coverage or mutation qualification is claimed.",
+    "No commits, pushes, dependency installations or explicit application restarts were performed."
+  ],
+  "sources": [
+    {
+      "path": "protocol/src/lib.rs",
+      "sha256": "4003e0edb45eb9a011e454f923a8c5bad9b5bb2290c8c502c52603ea3f7a1db0"
+    },
+    {
+      "path": "protocol/bindings/ValidationAnomaly.ts",
+      "sha256": "59140da563e31b3f79ac9ccffa63c1cb446794b4c2445f68059b6c5a84840e43"
+    },
+    {
+      "path": "protocol/bindings/AnomalyType.ts",
+      "sha256": "6f44a2672b1150eb6917ae4942efbb464bae652996741c6e0a8ed7d60cd56f0f"
+    },
+    {
+      "path": "protocol/bindings/NovelValidation.ts",
+      "sha256": "488a48bcf891723ad822c697a25db5f28c52bbb51dea4a31f00f302dc3fb6101"
+    },
+    {
+      "path": "packages/reader/src/validator.rs",
+      "sha256": "e32977f25fb52aed1a109033b29725ec2fb6cb2f380b028be088108098fb59ec"
+    },
+    {
+      "path": "apps/windows/native/src/review.rs",
+      "sha256": "8ca967afdb90f1d3dd463d9797dc5474261a0a7f324e23e5958ea8684b5ba358"
+    },
+    {
+      "path": "apps/windows/native/src/storage.rs",
+      "sha256": "a1aea2480a23276b11b387218284c65063b632d5747496315c02df5469daecdf"
+    },
+    {
+      "path": "apps/windows/native/src/lib.rs",
+      "sha256": "c96834eb4b3298d042c5936b8adec6e10fe504427be5948d8308c0658b40606f"
+    },
+    {
+      "path": "apps/windows/src/views/audit.vue",
+      "sha256": "0eb1641faaecde1b268add8653f4216820acad9f7e838eaf2570ba1d116119ac"
+    },
+    {
+      "path": "apps/windows/src/views/shelf.vue",
+      "sha256": "f9a1646205eaa15059d42ffd73f7e8a030ec4561fed531890099a3ba224114ab"
+    },
+    {
+      "path": "apps/windows/src/stores/library.ts",
+      "sha256": "3b800b67cb3572cef2636306cf920498b0efa5b9ed78095ccda309277e034efd"
+    },
+    {
+      "path": "apps/windows/tests/audit.cjs",
+      "sha256": "1a23701053a6e19309eb33f5012fd6cbb2785c36eca24f3df2a621201c890111"
+    },
+    {
+      "path": "apps/windows/tests/import.cjs",
+      "sha256": "2a96067dcd8d85305032d7005de1da8acf7497c1037a5114b7fbf277d722cdd8"
+    },
+    {
+      "path": "apps/windows/package.json",
+      "sha256": "5fc401e4439f419aa521f836100099d2a023eeab649b28ea388c1c8e75a7de83"
+    }
+  ]
+}

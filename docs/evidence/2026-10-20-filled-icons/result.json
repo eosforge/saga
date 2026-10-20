@@ -1,0 +1,443 @@
+{
+  "contract": "ICON-03",
+  "date": "2026-10-20",
+  "request": "Remove extra transparent padding while retaining intrinsic rounded corners.",
+  "operation": "Deterministic crop and alpha-fringe cleanup of the existing approved artwork; no image generation or redraw.",
+  "crop": {
+    "source": [
+      1254,
+      1254
+    ],
+    "crop": [
+      94,
+      94,
+      1066,
+      1066
+    ],
+    "corners": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "method": "Lossless pixel crop; no artwork redraw"
+  },
+  "raw_crop_pixel_identity": {
+    "allCroppedPixelsUnchanged": true,
+    "pixelSha256": "48b6b1f4a5aaf0fb222d7d9f57fd7f1e05ce844547fb5aeaf10d2a496d9f02ec"
+  },
+  "low_alpha_cleanup": {
+    "alphaAtMost": 16,
+    "nonzeroPixelsCleared": 6798,
+    "visiblePixelsPreserved": true,
+    "rawCrop": "target/filled-icons/raw-source.png"
+  },
+  "ico_corner_normalization": [
+    {
+      "size": 24,
+      "x": 0,
+      "y": 0,
+      "alphaBefore": 4,
+      "alphaAfter": 0
+    },
+    {
+      "size": 24,
+      "x": 23,
+      "y": 0,
+      "alphaBefore": 3,
+      "alphaAfter": 0
+    },
+    {
+      "size": 24,
+      "x": 0,
+      "y": 23,
+      "alphaBefore": 3,
+      "alphaAfter": 0
+    },
+    {
+      "size": 24,
+      "x": 23,
+      "y": 23,
+      "alphaBefore": 3,
+      "alphaAfter": 0
+    }
+  ],
+  "exports": [
+    {
+      "name": "32x32.png",
+      "size": [
+        32,
+        32
+      ],
+      "visibleAlphaAbove": 16,
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "cornerAlpha": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "64x64.png",
+      "size": [
+        64,
+        64
+      ],
+      "visibleAlphaAbove": 16,
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "cornerAlpha": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "128x128.png",
+      "size": [
+        128,
+        128
+      ],
+      "visibleAlphaAbove": 16,
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "cornerAlpha": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "128x128@2x.png",
+      "size": [
+        256,
+        256
+      ],
+      "visibleAlphaAbove": 16,
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "cornerAlpha": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "icon.png",
+      "size": [
+        512,
+        512
+      ],
+      "visibleAlphaAbove": 16,
+      "margin": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "cornerAlpha": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "ico-16",
+      "size": [
+        16,
+        16
+      ],
+      "visibleAlphaAbove": 16,
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "cornerAlpha": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "ico-24",
+      "size": [
+        24,
+        24
+      ],
+      "visibleAlphaAbove": 16,
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "cornerAlpha": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "ico-32",
+      "size": [
+        32,
+        32
+      ],
+      "visibleAlphaAbove": 16,
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "cornerAlpha": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "ico-48",
+      "size": [
+        48,
+        48
+      ],
+      "visibleAlphaAbove": 16,
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "cornerAlpha": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "ico-64",
+      "size": [
+        64,
+        64
+      ],
+      "visibleAlphaAbove": 16,
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "cornerAlpha": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "ico-256",
+      "size": [
+        256,
+        256
+      ],
+      "visibleAlphaAbove": 16,
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "cornerAlpha": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "path": "apps/windows/native/icons/source.png",
+      "sha256": "a8c6bb08b9761950b07554bf820cb87fc06bc098010e9dd1066dcefb52256bcd"
+    },
+    {
+      "path": "apps/windows/native/icons/32x32.png",
+      "sha256": "7751b8efbd790b12f5ba5ce09e02f57f139c46663c3b380dbf5d9af2894ebcb3"
+    },
+    {
+      "path": "apps/windows/native/icons/128x128.png",
+      "sha256": "2e412a2c7c5378bc6bd7eb5b0e7e9f46e9027ceeb07d0bf1b26d563784a39024"
+    },
+    {
+      "path": "apps/windows/native/icons/128x128@2x.png",
+      "sha256": "9616fc5543d696cffd1e72e84d1fa2546277876728fece87c868259166afb48a"
+    },
+    {
+      "path": "apps/windows/native/icons/icon.png",
+      "sha256": "2742237ba8fb48e7227dac3a17c99f7f35c1eae04db289f94c2c06aaad567bab"
+    },
+    {
+      "path": "apps/windows/native/icons/icon.ico",
+      "sha256": "00ff4cae1f6cba0e289a3f2978bb0b924168eea154e496705c7eb19a5edf83c0"
+    },
+    {
+      "path": "apps/windows/native/icons/icon.icns",
+      "sha256": "a1899f34c1a8333bc8d163b0b474d330fc3d0ac1ee306437f922dec10f455625"
+    },
+    {
+      "path": "apps/windows/public/logo.png",
+      "sha256": "2742237ba8fb48e7227dac3a17c99f7f35c1eae04db289f94c2c06aaad567bab"
+    },
+    {
+      "path": "apps/windows/public/favicon.png",
+      "sha256": "1f69194ddf0a9ad6bd46b00a9253cc45d039020af44fe699c1ab4c8124672691"
+    },
+    {
+      "path": "apps/windows/public/favicon.ico",
+      "sha256": "00ff4cae1f6cba0e289a3f2978bb0b924168eea154e496705c7eb19a5edf83c0"
+    }
+  ],
+  "ico_frames": [
+    {
+      "size": [
+        16,
+        16
+      ],
+      "sha256": "2908bdaea5b44395c204e351039d1c46fa9c3cc0c13d885370b75b5ca0225c78"
+    },
+    {
+      "size": [
+        24,
+        24
+      ],
+      "sha256": "6961c56da478d4d65042db87c8544e06be84ae4c75cfcc2fe185ebef7749f0b5"
+    },
+    {
+      "size": [
+        32,
+        32
+      ],
+      "sha256": "96e46a47a3bdc43fe161c2ed51271796a24e04cd3bebf12c41e9f78f4b476c59"
+    },
+    {
+      "size": [
+        48,
+        48
+      ],
+      "sha256": "a1df2695ca25fcb9dc9a9c61cfa3006cc05bee5763cb2ebc864020da6fef3bae"
+    },
+    {
+      "size": [
+        64,
+        64
+      ],
+      "sha256": "063a8f15b630c65b080f2e390243be0a379792f2745944a76517a4652be085a5"
+    },
+    {
+      "size": [
+        256,
+        256
+      ],
+      "sha256": "2839b905ed481697aa142cc9f7ba56752b72f53024bf8c2a1f7bb2dd9865ebf4"
+    }
+  ],
+  "embedded_frames": [
+    {
+      "size": [
+        16,
+        16
+      ],
+      "sha256": "2908bdaea5b44395c204e351039d1c46fa9c3cc0c13d885370b75b5ca0225c78"
+    },
+    {
+      "size": [
+        24,
+        24
+      ],
+      "sha256": "6961c56da478d4d65042db87c8544e06be84ae4c75cfcc2fe185ebef7749f0b5"
+    },
+    {
+      "size": [
+        32,
+        32
+      ],
+      "sha256": "96e46a47a3bdc43fe161c2ed51271796a24e04cd3bebf12c41e9f78f4b476c59"
+    },
+    {
+      "size": [
+        48,
+        48
+      ],
+      "sha256": "a1df2695ca25fcb9dc9a9c61cfa3006cc05bee5763cb2ebc864020da6fef3bae"
+    },
+    {
+      "size": [
+        64,
+        64
+      ],
+      "sha256": "063a8f15b630c65b080f2e390243be0a379792f2745944a76517a4652be085a5"
+    },
+    {
+      "size": [
+        256,
+        256
+      ],
+      "sha256": "2839b905ed481697aa142cc9f7ba56752b72f53024bf8c2a1f7bb2dd9865ebf4"
+    }
+  ],
+  "artifact": {
+    "path": "target/icon-check/Filled.exe",
+    "sha256": "953b3318541e669f789154018e875c29fc6f1b24c6458397e2352bca91c66753",
+    "matches_source": true
+  },
+  "default_executable": {
+    "path": "target/debug/native.exe",
+    "matches_source": true
+  },
+  "checks": [
+    {
+      "command": "cargo rustc --offline --locked -p native --bin native -- -o D:/laconis/saga/target/icon-check/Filled.exe",
+      "exit_code": 0,
+      "log": "native-build.log"
+    },
+    {
+      "command": "pnpm build",
+      "exit_code": 0,
+      "log": "frontend-after-style.log"
+    }
+  ],
+  "backup": {
+    "archive": "before.zip",
+    "manifest": "before.json"
+  },
+  "live_window": "No manual application lifecycle action or live visual acceptance."
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "source": "AGENT_WORKLOG.md",
+    "archive": "docs/chronicle/2026-10-19-worklog.md",
+    "sha256": "1eccc1c0d182bd54ff26412cb831d3802d3a2a66f96b6825924dbde1fca83ffc"
+  },
+  {
+    "source": "AGENT_WORKLOG_CN.md",
+    "archive": "docs/chronicle/2026-10-19-worklog_CN.md",
+    "sha256": "4b83408f501eba33c05cad5dcc7dbb07a48f4e9f2f289a810cd60abc5773776e"
+  }
+]

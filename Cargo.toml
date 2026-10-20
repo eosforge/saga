@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = [
+    "protocol",
+    "packages/reader",
+    "server/gateway",
+    "apps/windows/native",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Saga Contributors"]
+
+[workspace.dependencies]
+tokio = { version = "1.40", features = ["full"] }
+axum = { version = "0.7", features = ["macros"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+blake3 = "1.5"
+regex = "1.10"
+encoding_rs = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ts-rs = { version = "10.1", features = ["serde-compat"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+thiserror = "1.0"
+anyhow = "1.0"
+
+[profile.dev.package."*"]
+opt-level = 2

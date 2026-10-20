@@ -5,17 +5,21 @@
 
 # Dependencies & Build
 node_modules/
+**/node_modules/
 dist/
+**/dist/
 build/
 out/
 .next/
 .nuxt/
 .output/
+.vite/
+**/.vite/
 
 # Rust / Tauri
 target/
-src-tauri/target/
-Cargo.lock
+**/target/
+
 
 # Python / Pip
 __pycache__/
@@ -49,3 +53,6 @@ yarn-debug.log*
 pnpm-debug.log*
 .DS_Store
 Thumbs.db
+
+# Generated native schemas are reproducible build output.
+apps/windows/native/gen/

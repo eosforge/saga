@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "purpose": "local-feedback",
+  "qualification": "not-qualified",
+  "components": [
+    { "id": "protocol", "path": "protocol", "level": "L2" },
+    { "id": "reader", "path": "packages/reader", "level": "L2" },
+    { "id": "native", "path": "apps/windows/native", "level": "L2" },
+    { "id": "interface", "path": "apps/windows/src", "level": "L2" },
+    { "id": "gateway", "path": "server/gateway", "level": "L1" },
+    { "id": "tooling", "path": "tools", "level": "L2" }
+  ],
+  "environment": {
+    "verifiedPlatform": "win32-x64",
+    "rust": "1.98.0",
+    "node": "24.18.0",
+    "typescript": "5.9.3"
+  },
+  "checks": [
+    { "id": "runner", "program": "node", "cwd": ".", "args": ["--test", "tools/check.test.cjs"], "timeoutMs": 30000 },
+    { "id": "format", "program": "cargo", "cwd": ".", "args": ["fmt", "--all", "--", "--check"], "timeoutMs": 30000 },
+    { "id": "clippy", "program": "cargo", "cwd": ".", "args": ["clippy", "--offline", "--locked", "--workspace", "--all-targets", "--", "-D", "warnings"], "timeoutMs": 180000 },
+    { "id": "rust", "program": "cargo", "cwd": ".", "args": ["test", "--offline", "--locked", "--workspace"], "timeoutMs": 180000 },
+    { "id": "style", "program": "node", "cwd": "apps/windows", "args": ["tools/style.cjs"], "timeoutMs": 30000 },
+    { "id": "frontend", "program": "node", "cwd": "apps/windows", "args": ["--test", "tests/*.cjs"], "timeoutMs": 30000 },
+    { "id": "types", "program": "node", "cwd": "apps/windows", "args": ["node_modules/vue-tsc/bin/vue-tsc.js", "--noEmit"], "timeoutMs": 30000 },
+    { "id": "build", "program": "node", "cwd": "apps/windows", "args": ["node_modules/vite/bin/vite.js", "build"], "timeoutMs": 30000 }
+  ]
+}

@@ -1,0 +1,319 @@
+{
+  "contract": "ICON-02",
+  "date": "2026-10-20",
+  "purpose": "True transparent rounded icon boundary in PNG, ICO and native resources",
+  "mode": "built-in image_gen edit; deterministic Tauri CLI format exports",
+  "prompt_summary": "Preserve dark rounded tile, cyan/gold S ribbon and open book; remove blue-grey drafting-grid exterior to true transparent alpha.",
+  "source": "apps/windows/native/icons/source.png",
+  "generator": "Installed Tauri CLI 2.12.3: icon source.png --output target/rounded-icons; 64px PNG export for browser favicon.",
+  "pngs": [
+    {
+      "path": "apps/windows/native/icons/source.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "3c4da68abcd05bfd2858bf9b529849193c9faa65625d7bf071388e914290c254"
+    },
+    {
+      "path": "apps/windows/native/icons/32x32.png",
+      "size": [
+        32,
+        32
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "cc2bdfcec6768aacdc9be4549dde945af1df47d8dcf99b6c93883e01c81fd4fc"
+    },
+    {
+      "path": "apps/windows/native/icons/128x128.png",
+      "size": [
+        128,
+        128
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "c67b42431a609c7ed5f15c5ad09543b3bef2ed170fb27eee18254ac5638e7a06"
+    },
+    {
+      "path": "apps/windows/native/icons/128x128@2x.png",
+      "size": [
+        256,
+        256
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "02b5928068a19aa4f759442a68b47c0ea54131061ef6518e2f911ac781c7a5d6"
+    },
+    {
+      "path": "apps/windows/native/icons/icon.png",
+      "size": [
+        512,
+        512
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "f1b68007aca96d56f6f740e487eacbbde27a611a11d49040d74648671d6f5376"
+    },
+    {
+      "path": "apps/windows/public/logo.png",
+      "size": [
+        512,
+        512
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "f1b68007aca96d56f6f740e487eacbbde27a611a11d49040d74648671d6f5376"
+    },
+    {
+      "path": "apps/windows/public/favicon.png",
+      "size": [
+        64,
+        64
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "d90bc11b96619450c2785aea837ea6649f665d2c8bd70e030d39eb64cba09c70"
+    }
+  ],
+  "ico_frames": [
+    {
+      "size": [
+        16,
+        16
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "f6e75909e9df8f3103ee2abe48df61132290774c06bf8c4b6433c080c151c9a2"
+    },
+    {
+      "size": [
+        24,
+        24
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "4e57b1bf70cb2882db46deebb0ff820f81b23dcf4550beaac7ebc9e22b808228"
+    },
+    {
+      "size": [
+        32,
+        32
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "497928fee67781e8207bb972615b3a19f1d742aae3e0a3474b25f9e7e87e91fa"
+    },
+    {
+      "size": [
+        48,
+        48
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "ee3d8c1e601ca877b17dce6988c21c98b18c48aa3afa74be39b7f2a517f198fa"
+    },
+    {
+      "size": [
+        64,
+        64
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "66e8aa2ac29fe1e0ff649f9e5125e518812b3477197549cb9027613f7fa3dce7"
+    },
+    {
+      "size": [
+        256,
+        256
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "02b5928068a19aa4f759442a68b47c0ea54131061ef6518e2f911ac781c7a5d6"
+    }
+  ],
+  "embedded_frames": [
+    {
+      "size": [
+        16,
+        16
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "f6e75909e9df8f3103ee2abe48df61132290774c06bf8c4b6433c080c151c9a2"
+    },
+    {
+      "size": [
+        24,
+        24
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "4e57b1bf70cb2882db46deebb0ff820f81b23dcf4550beaac7ebc9e22b808228"
+    },
+    {
+      "size": [
+        32,
+        32
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "497928fee67781e8207bb972615b3a19f1d742aae3e0a3474b25f9e7e87e91fa"
+    },
+    {
+      "size": [
+        48,
+        48
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "ee3d8c1e601ca877b17dce6988c21c98b18c48aa3afa74be39b7f2a517f198fa"
+    },
+    {
+      "size": [
+        64,
+        64
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "66e8aa2ac29fe1e0ff649f9e5125e518812b3477197549cb9027613f7fa3dce7"
+    },
+    {
+      "size": [
+        256,
+        256
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "center_alpha": 253,
+      "sha256": "02b5928068a19aa4f759442a68b47c0ea54131061ef6518e2f911ac781c7a5d6"
+    }
+  ],
+  "resource_matches_source": true,
+  "build": {
+    "command": "cargo rustc --offline --locked -p native --bin native -- -o D:/laconis/saga/target/icon-check/Rounded.exe",
+    "exit_code": 0,
+    "log": "build.log",
+    "sha256": "317ab2224c9f73c2df2ed83da74f831586794eb45eb7dc455bc6f4e3c1612256"
+  },
+  "artifact": {
+    "path": "target/icon-check/Rounded.exe",
+    "sha256": "675d78270f08bcf94ce2a558b6d9d141a880c1121932bf2cc202bb35c38dea6f"
+  },
+  "frontend_build": {
+    "command": "pnpm build",
+    "exit_code": 0
+  },
+  "backup": {
+    "archive": "before.zip",
+    "manifest": "before.json"
+  },
+  "live_window": "No manual process lifecycle change or live visual acceptance. PNG/ICO transparency and embedded frames verified directly.",
+  "default_executable": {
+    "path": "target/debug/native.exe",
+    "matches_current_ico": true,
+    "sha256": "de0226da8fe6f922975433c9f4b0df5b946a186a797cfd7e6deff19c7dfaa327"
+  },
+  "default_build": {
+    "command": "cargo build --offline --locked -p native --bin native",
+    "exit_code": 0,
+    "log": "default-build.log",
+    "sha256": "e27ac92dd454cb9680bb18d095a9bd758d8f0d79919360f9446648e7d3c67830"
+  }
+}

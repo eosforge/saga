@@ -1,0 +1,4 @@
+# Keep maintained text in LF form; frozen archives retain their original bytes.
+* text=auto eol=lf
+docs/chronicle/2026-10-19-worklog.md -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+docs/chronicle/2026-10-19-worklog_CN.md -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

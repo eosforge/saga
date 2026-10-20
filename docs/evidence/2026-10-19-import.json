@@ -1,0 +1,87 @@
+{
+  "scope": "GAP-01: picker completion and responsive import feedback",
+  "date": "2026-10-19",
+  "authorization": "Current user request to fix file picker hangs and import progress stalls.",
+  "status": "implemented; offline checks passed; native interaction verification pending",
+  "findings": [
+    "Progress previously began at a fixed 15 percent without read or parse updates.",
+    "Pinned rfd 0.15.4 ThreadFuture has a possible lost-wakeup interval; it is a code-level finding, not a reproduced cause of the reported native-window delay."
+  ],
+  "implementation": [
+    "Parented synchronous file picker on a blocking worker; completion precedes import.",
+    "Incremental 256 KiB reads; parser reports processed UTF-8 bytes every 256 lines and at completion.",
+    "Progress events are limited to phase/percentage changes. Non-measured phases use activity animation. IPC response gates frontend completion.",
+    "Single picker/import guard, progress subscription before import, and late-event/unmount protection.",
+    "The active path now propagates cache/database save failures instead of reporting success. Existing database transaction design was not changed."
+  ],
+  "checks": [
+    {
+      "command": "cargo test --offline --locked -p reader -p native --lib",
+      "cwd": "D:/laconis/saga",
+      "exit_code": 0,
+      "tests": 16,
+      "log": "2026-10-19-import-rust.log"
+    },
+    {
+      "command": "cargo test --offline --locked -p protocol --lib",
+      "cwd": "D:/laconis/saga",
+      "exit_code": 0,
+      "tests": 15,
+      "log": "2026-10-19-import-protocol.log"
+    },
+    {
+      "command": "node --test tests/import.cjs",
+      "cwd": "D:/laconis/saga/apps/windows",
+      "exit_code": 0,
+      "tests": 5,
+      "log": "2026-10-19-import-ui.log"
+    },
+    {
+      "command": "pnpm build",
+      "cwd": "D:/laconis/saga/apps/windows",
+      "exit_code": 0,
+      "log": "2026-10-19-import-build.log",
+      "warning": "Vite reports mixed static/dynamic imports of Tauri core; build succeeds."
+    }
+  ],
+  "limitations": [
+    "No actual native file dialog interaction or user-file latency measurement was performed.",
+    "Frontend tests use deterministic mocked IPC and lifecycle hooks, not a rendered browser or WebView.",
+    "No intensive coverage/mutation/fault-injection qualification or formal development gate was computed.",
+    "No service stop/start, commit, push, dependency download, or production data migration was invoked."
+  ],
+  "sources": [
+    {
+      "path": "apps/windows/native/src/lib.rs",
+      "sha256": "d36e652e50ad608133ee4bc050fa39d6bc34d1250b033b85863def01ff62e922"
+    },
+    {
+      "path": "apps/windows/native/src/ingestion.rs",
+      "sha256": "263835b04ff8f232729e052beb6771bbf4bf943ad8f87910c4e48805cddb32ea"
+    },
+    {
+      "path": "packages/reader/src/lib.rs",
+      "sha256": "06bdf67ec0ca68162ba81622bcb0f0b494815798a7785df0b5e4a3dea49327b2"
+    },
+    {
+      "path": "apps/windows/src/views/shelf.vue",
+      "sha256": "09d5ce5bd03a1a37174e1300f5cdc3418270db008a982bcd42fb0a90fa294656"
+    },
+    {
+      "path": "apps/windows/tests/import.cjs",
+      "sha256": "19fda008c8c2a2f7f396fca5cc437b12fd74f50068815298681962d113349844"
+    },
+    {
+      "path": "apps/windows/package.json",
+      "sha256": "3927fb991752171c0de956c46bd514c92a92740a5a9fa197902ca5d5d31fa950"
+    },
+    {
+      "path": "protocol/src/lib.rs",
+      "sha256": "dbcabd71821e5514d7fd4d77cc21f530ab47978d468317d02fabe2c3b50d14f9"
+    },
+    {
+      "path": "protocol/bindings/ImportProgress.ts",
+      "sha256": "63b8b77296e596a166d16672483cf5ecb39b6c0debf5837c8719f1bf4c16d4f6"
+    }
+  ]
+}

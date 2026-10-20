@@ -1,0 +1,63 @@
+{
+  "contract": "CLEAN-01",
+  "date": "2026-10-20",
+  "classification": "scoped-local-verification",
+  "formal_qualification": "not-qualified",
+  "local_receipt": {
+    "path": "docs/evidence/2026-10-20T02-46-03-853Z-dbe04c85/receipt.json",
+    "sha256": "17c662f482eefcca5d2064cc7b9e8845b168a3e25ea00b510c9b5b93962bcad3",
+    "checks_passed": 8,
+    "source_unchanged": true
+  },
+  "counts": {
+    "rust_passed": 54,
+    "rust_default_ignored": 2,
+    "frontend_passed": 23,
+    "tool_selfchecks_passed": 2,
+    "optional_original_book_passed": 2
+  },
+  "sample": {
+    "bytes": 27432041,
+    "sha256": "ec1e5a5ee7e86bea3c21de123f8d3c851b44b7b05754d911fd406e733e6e5bd9",
+    "operation": "read-only; isolated in-memory database",
+    "log": "original-after.log",
+    "log_sha256": "f0838829d94e85003c2b800fc211c2e68a71c4295a1e1281377cc354ac57860f"
+  },
+  "documents": {
+    "english_checked": 13,
+    "broken_local_links": [],
+    "root_markdown": [
+      "AGENTS.md",
+      "AGENTS_CN.md",
+      "README.md",
+      "README_CN.md"
+    ],
+    "translation_status": "deferred until immediately before an authorized commit; existing Chinese files were moved but not synchronized after the policy change"
+  },
+  "baseline": {
+    "manifest": "before.json",
+    "original_archive": "before.zip",
+    "path_preserving_archive": "before-paths.zip",
+    "missing_content": []
+  },
+  "retained_failures": {
+    "storage-before.log": "counterexamples reproduced nontransactional deletion and invalid index acceptance",
+    "numerals-before.log": "positional Chinese digits returned 6 instead of 2026",
+    "clippy-before.log": "unchecked manual division lint",
+    "clippy-second.log": "needless borrow introduced during path refactor; repaired",
+    "frontend-first.log": "test fixture expected the old dependency set; updated to load real transitive modules"
+  },
+  "concurrent_work": "Existing icon assets, browser favicon, and sidebar branding preserved.",
+  "boundaries": [
+    "No commit or push",
+    "No application/service lifecycle changes",
+    "No dependency installation",
+    "No live database migration or book reparse",
+    "No installer or release qualification"
+  ],
+  "gaps": [
+    "GAP-04 formal engineering qualification and real desktop acceptance",
+    "GAP-05 distribution license texts and notices"
+  ],
+  "interpretation": "Counts reflect finite native test results; no coverage, MC/DC, mutation, performance, or cross-platform pass is inferred."
+}

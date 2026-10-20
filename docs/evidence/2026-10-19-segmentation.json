@@ -1,0 +1,128 @@
+{
+  "contract": "SEG-01",
+  "date": "2026-10-19",
+  "status": "implemented; scoped checks and final whole-book preservation test passed; all reported sample conflicts reviewed",
+  "authorization": "Current user explicitly authorized segmentation algorithm refactoring and online references.",
+  "references": [
+    "https://github.com/readest/readest/blob/main/apps/readest-app/src/utils/txt.ts"
+  ],
+  "findings": [
+    "The old lexical rule treated paragraph labels and chapter headings as peers.",
+    "The cached 27432041-byte book reproduced the Chapter 225 bug. After hierarchical selection, both labels were retained and Chapter 226 immediately followed.",
+    "The same whole-book run then failed the independent explicit-heading oracle: 3153 retained versus 3165 source headings. The cache disappeared before detailed missing-title inspection.",
+    "Explicit chapter titles ending in ellipses/commas were incorrectly rejected. The correction passes its synthetic regression and the final original-file test retains all 3165 explicit titles, resolving the 12 prior omissions.",
+    "Shorter reimports left stale SQLite sections and duplicate shelf items; injected failure also showed metadata could change before the sections transaction. All three counterexamples now pass.",
+    "All final validation conflicts were reviewed: two source duplicate chapter numbers (2656 and 2680), with distinct titles and consecutive narrative bodies. Both chapters in each pair must be retained; validation correctly remains is_valid=false."
+  ],
+  "checks": [
+    {
+      "command": "cargo test --offline --locked -p reader -p native",
+      "exit_code": 0,
+      "passed": 28,
+      "ignored": 1,
+      "log": "2026-10-19-segmentation-final-rust.log"
+    },
+    {
+      "command": "pnpm test",
+      "cwd": "apps/windows",
+      "exit_code": 0,
+      "passed": 6,
+      "log": "2026-10-19-segmentation-final-ui.log"
+    },
+    {
+      "command": "pnpm build",
+      "cwd": "apps/windows",
+      "exit_code": 0,
+      "log": "2026-10-19-segmentation-final-build.log",
+      "warning": "Existing Vite mixed static/dynamic Tauri core import warning."
+    },
+    {
+      "command": "cargo test --offline --locked -p reader --test segmentation cached_book_preserves_chapter_225_and_all_explicit_headings -- --ignored --nocapture",
+      "exit_code": 0,
+      "passed": 1,
+      "log": "2026-10-19-segmentation-conflicts.log",
+      "explicit_headings": 3165,
+      "sections": 3167,
+      "volume_groups": 16,
+      "parse_ms": 211,
+      "warnings": 0,
+      "anomalies": 2,
+      "oracle": "Exact source titles, order, and multiplicity; paragraph labels retained in Chapter 225 followed immediately by Chapter 226."
+    }
+  ],
+  "preserved_failures": [
+    "2026-10-19-segmentation-before.log",
+    "2026-10-19-segmentation-sample-before.log",
+    "2026-10-19-segmentation-sample-after.log",
+    "2026-10-19-segmentation-storage-before.log",
+    "2026-10-19-segmentation-ui-before.log",
+    "2026-10-19-segmentation-punctuation-before.log"
+  ],
+  "limitations": [
+    "No automatic reparse or migration of user data was performed. The sample was read only.",
+    "No formal intensive-development gate, exhaustive coverage, or mutation qualification was computed.",
+    "No commits, pushes, dependency installs, or explicit application restarts were performed."
+  ],
+  "sources": [
+    {
+      "path": "packages/reader/src/lib.rs",
+      "sha256": "4e60d8263b86acdba2157a73daaafefd83fe3bfa9c72805ffb242bd38329ef3b"
+    },
+    {
+      "path": "packages/reader/src/heading.rs",
+      "sha256": "067d25babc0e4af73c9a020be6ff6feac41017936a2f27fa24eacfd4c1f4706c"
+    },
+    {
+      "path": "packages/reader/src/validator.rs",
+      "sha256": "e75c42d01e1f736ae7d16694f6b00fadc9b57ccf98f79abee736c99262ce184b"
+    },
+    {
+      "path": "packages/reader/tests/segmentation.rs",
+      "sha256": "f7d453e3b54bf91fd0e6987b7ad1f16cd761aa3ba2b99499fcaff012c060481b"
+    },
+    {
+      "path": "apps/windows/native/src/storage.rs",
+      "sha256": "9417b48a33a8d9b75c0df1e9a7f5a2e636ec80e5ddfaaa5173ca2bba06698ede"
+    },
+    {
+      "path": "apps/windows/src/stores/library.ts",
+      "sha256": "f4b112beaf5adf56255bfaded07b59c7895719b8b4f066a2ecd0eb9284fc9f54"
+    },
+    {
+      "path": "apps/windows/tests/import.cjs",
+      "sha256": "6cf95308d17d85f85407d8d08b35d6ed95c82d8f883de020f4b5f1540d00140e"
+    }
+  ],
+  "sample": {
+    "path": "D:\\texts\\修真聊天群.txt",
+    "bytes": 27432041,
+    "sha256": "ec1e5a5ee7e86bea3c21de123f8d3c851b44b7b05754d911fd406e733e6e5bd9",
+    "unchanged_during_review": true,
+    "conflicts": [
+      {
+        "number": 2656,
+        "lines": [
+          233189,
+          233253
+        ],
+        "titles": [
+          "第2656章 为什么我会如此悲伤",
+          "第2656章 我就知道遇上霸宋不会有好事"
+        ],
+        "verdict": "source duplicate number; distinct narrative bodies; retain both sections and alert"
+      },
+      {
+        "number": 2680,
+        "lines": [
+          234672,
+          234743
+        ],
+        "titles": [
+          "第2680章 结终一拳",
+          "第2680章 长生柱：虚日柱！"
+        ],
+        "verdict": "source duplicate number; distinct narrative bodies; retain both sections and alert"
+      }
+    ]
+  }
+}

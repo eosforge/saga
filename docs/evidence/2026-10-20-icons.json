@@ -1,0 +1,114 @@
+{
+  "contract": "ICON-01",
+  "date": "2026-10-20",
+  "scope": "Windows executable icon resource; taskbar/title bar",
+  "cause": "The previous native.exe resource contained one old 256px image instead of the six current Saga frames; ICO was absent from build rerun inputs.",
+  "source": {
+    "path": "apps/windows/native/icons/icon.ico",
+    "sha256": "49f89dcb2c4d30240f8317f87c366456018f017dfe0cabfc9cc9d00dba2b15bc",
+    "frames": [
+      {
+        "size": [
+          16,
+          16
+        ],
+        "sha256": "245db0df30659a06a9889868f3f4f8148d8c8583f7771b188731a83b246e3402"
+      },
+      {
+        "size": [
+          32,
+          32
+        ],
+        "sha256": "4a8183dd495a7e8d7c77d6ea22503721b7ee745b93f9f036579bcd20bbe4bd32"
+      },
+      {
+        "size": [
+          48,
+          48
+        ],
+        "sha256": "2c882389420a75f9ca4020c23d232a4a7047169530e4a0c5ac71705cbeff54ff"
+      },
+      {
+        "size": [
+          64,
+          64
+        ],
+        "sha256": "066e17ecfb214ac8779937e52f80c63926c782cb1b3ec1c254d87e600b02eb33"
+      },
+      {
+        "size": [
+          128,
+          128
+        ],
+        "sha256": "54544618241f692cbd0cb0591ef9e1daf041377f710558dee8b722cc622fd8d0"
+      },
+      {
+        "size": [
+          256,
+          256
+        ],
+        "sha256": "fa105399245c26b1bd5b9498c4bd21b65cf12280bc9b8a9cddf2cfc9ed188e2e"
+      }
+    ]
+  },
+  "artifact": {
+    "path": "target/icon-check/Saga.exe",
+    "sha256": "32fee6496407d5bb7552d73f33a6bbda4de472dc3f50fc8e604b3297e9791c2f",
+    "frames": [
+      {
+        "size": [
+          16,
+          16
+        ],
+        "sha256": "245db0df30659a06a9889868f3f4f8148d8c8583f7771b188731a83b246e3402"
+      },
+      {
+        "size": [
+          32,
+          32
+        ],
+        "sha256": "4a8183dd495a7e8d7c77d6ea22503721b7ee745b93f9f036579bcd20bbe4bd32"
+      },
+      {
+        "size": [
+          48,
+          48
+        ],
+        "sha256": "2c882389420a75f9ca4020c23d232a4a7047169530e4a0c5ac71705cbeff54ff"
+      },
+      {
+        "size": [
+          64,
+          64
+        ],
+        "sha256": "066e17ecfb214ac8779937e52f80c63926c782cb1b3ec1c254d87e600b02eb33"
+      },
+      {
+        "size": [
+          128,
+          128
+        ],
+        "sha256": "54544618241f692cbd0cb0591ef9e1daf041377f710558dee8b722cc622fd8d0"
+      },
+      {
+        "size": [
+          256,
+          256
+        ],
+        "sha256": "fa105399245c26b1bd5b9498c4bd21b65cf12280bc9b8a9cddf2cfc9ed188e2e"
+      }
+    ],
+    "matches_source": true
+  },
+  "build": {
+    "command": "cargo rustc --offline --locked -p native --bin native -- -o D:/laconis/saga/target/icon-check/Saga.exe",
+    "exit_code": 0,
+    "note": "Output redirected to a separate artifact to avoid replacing the running executable; rustc emitted output-path adaptation warnings.",
+    "icon_tracking_observed": [
+      "target/debug/build/native-8fbc5e93392da8f4/output"
+    ]
+  },
+  "format_check": "cargo fmt --all -- --check passed",
+  "live_window": "No manual process lifecycle action or visual window acceptance performed; existing development tooling may relaunch the native application after source/config changes.",
+  "default_executable": "The current target/debug/native.exe icon resource was also read back and matches all six source frames."
+}

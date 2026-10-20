@@ -1,0 +1,106 @@
+{
+  "milestone": "READ-01",
+  "timestamp": "2026-10-20T03:37:55.8764718Z",
+  "scope": "Three reader toolbar icons, session font settings, audio resource visibility and input guards",
+  "checks": {
+    "typecheckAndBuild": "passed",
+    "frontendTests": 29,
+    "gitDiffCheck": 0,
+    "frontendFailures": 0,
+    "scriptLint": "passed"
+  },
+  "nativeInteraction": {
+    "remaining": [
+      "Desktop Escape focus restoration and directory toggle were not confirmed after user stopped Computer Use"
+    ],
+    "status": "partial; user stopped Computer Use",
+    "automated": [
+      "Settings dismissal, focus, and teardown tested through actual component script",
+      "Actual Vue templates tested for three toolbar buttons and audio-dependent bars"
+    ],
+    "observed": [
+      "Running application refreshed without restarting services",
+      "Three icon buttons rendered in reader",
+      "Text-only shelf and reader hide narration controls",
+      "Settings popover rendered with font slider"
+    ]
+  },
+  "limitations": [
+    "Only TXT import exists; .saga parsing and real audio playback are not implemented",
+    "Audio predicate checks selected-book nonempty loaded audio Blobs and MIME, not codec decodability",
+    "Positive audio tests use synthetic resource fixtures, not imported .saga archives",
+    "No commit, installation, service restart, or book persistence mutation performed"
+  ],
+  "files": [
+    {
+      "path": "apps/windows/src/views/Reader.vue",
+      "sha256": "05ede8d79720bdbb1a4df254fcb16695dccfdc01acf69b5d6111c71693a3da43"
+    },
+    {
+      "path": "apps/windows/src/views/Shelf.vue",
+      "sha256": "3a872cce1d8f818363c8265cef7f8971dc4bb277cca86d504bb605b259a18dcf"
+    },
+    {
+      "path": "apps/windows/src/components/Bar.vue",
+      "sha256": "6308f7a3b84fe04823b67c0e2b043de3995648565a9c8ed64a9bf08d3297ae21"
+    },
+    {
+      "path": "apps/windows/src/App.vue",
+      "sha256": "1a2511d6943ccec9229b3cd68959c30866c98b76789797ca794bdd25b45f90db"
+    },
+    {
+      "path": "apps/windows/src/stores/library.ts",
+      "sha256": "8238e9ffe5d2c1f7e29bb36391812efb9c7f46605d5d7774604077428f915de1"
+    },
+    {
+      "path": "apps/windows/tests/lifecycle.cjs",
+      "sha256": "bdf0e226d97282714ac909810fa681b478523a1d9bf954eab7cf140641beec9f"
+    },
+    {
+      "path": "apps/windows/tests/library.cjs",
+      "sha256": "8594ff05793957aee972b016eaa33d1f946bf34df0ef918f30ec5569fbc6696c"
+    },
+    {
+      "path": "apps/windows/tests/reader.cjs",
+      "sha256": "bd18067da4abf4d103a1d45dcba50284a1b80e2ff0579feb3d3fd35c16f156de"
+    },
+    {
+      "path": "apps/windows/tests/support/loader.cjs",
+      "sha256": "d3570547d4daa9ca4a30b04be58e5931a07e4b320ffc70c91e65b8f437fbd77a"
+    },
+    {
+      "path": "docs/architecture.md",
+      "sha256": "87790f8764e05748594ed28f62bfa762dfe58de64ca88dfc35053dcf91f29c73"
+    },
+    {
+      "path": "docs/worklog.md",
+      "sha256": "edbb89b1df70196d783581109bd4bf99799e66a64f9430d48ed6a3e4258e5221"
+    }
+  ],
+  "logs": [
+    {
+      "path": "before-tests.log",
+      "sha256": "75fdb619c19ec7df35b5b134b3bc863af8c23779e1c46d97eb84e5ab1faf56a0"
+    },
+    {
+      "path": "after-tests.log",
+      "sha256": "7050e962da5edbf9444d35287ba87fbe51a071d5bc439bd23ac92375d9011d57"
+    },
+    {
+      "path": "render-tests.log",
+      "sha256": "d3108657d41a1f03da4a3e5913d20b68f196f48811bf78f4a776ed00af8c96cb"
+    },
+    {
+      "path": "final-tests.log",
+      "sha256": "ab90357003c9995580772174967c0ebe2588d65097da716ab725d41c9b7baab8"
+    },
+    {
+      "path": "lint.log",
+      "sha256": "07efe3d202be67a4de791a599988198b01bd799028544e0a6614318cfd09339d"
+    },
+    {
+      "path": "build.log",
+      "sha256": "118ea2d6fdf0bf51c36443bb0c2ce0b46f6ddbd33c5710b15a89c17f616ee165"
+    }
+  ]
+}
