@@ -111,6 +111,15 @@ function project(book: BookItem, index: number): void {
   const section = sections[book.currentChapterIndex];
   book.currentChapter = section?.title || "";
   book.sentences = section ? contents(section) : [];
+  const total = sections.length || book.chapters || 0;
+  book.progress = total <= 1 || book.currentChapterIndex <= 0
+    ? 0
+    : book.currentChapterIndex >= total - 1
+      ? 100
+      : Math.min(99, Math.max(1, Math.round(((book.currentChapterIndex + 1) / total) * 100)));
+  if (book.currentChapterIndex > 0) {
+    book.lastRead = "最近阅读";
+  }
   if (activeBookId.value === book.id) {
     pause();
     activeSentenceIndex.value = 0;
@@ -119,6 +128,11 @@ function project(book: BookItem, index: number): void {
 
 /** Hydrate if necessary, then select a valid section; load errors remain visible. */
 export async function setBookChapter(bookId: string, chapterIndex: number): Promise<void> {
+  const current = books.value.find((item) => item.id === bookId);
+  if (current?.sections) {
+    if (current.sections[chapterIndex]) project(current, chapterIndex);
+    return;
+  }
   await ensureBookLoaded(bookId);
   const book = books.value.find((item) => item.id === bookId);
   if (book?.sections?.[chapterIndex]) project(book, chapterIndex);

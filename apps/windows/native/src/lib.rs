@@ -82,8 +82,9 @@ fn ingest(app: &tauri::AppHandle, path_str: String) -> Result<NovelImportResult,
 
     report("validating", "正在检查卷章顺序...", 80);
     report("persisting", "正在保存书籍与章节...", 85);
+    let books_dir = paths::directory(app, "books")?;
     let conn = storage::open(&paths::directory(app, "storage")?.join("saga.db"))?;
-    storage::save(&conn, &novel, "TXT")?;
+    storage::save(&conn, &novel, "TXT", &books_dir)?;
     let validation = review::inspect(&conn, &book_id, &novel.sections)?;
     report("completed", "正在加载分析结果...", 99);
 
@@ -139,12 +140,13 @@ async fn import_txt_bytes(app: tauri::AppHandle, bytes: Vec<u8>, title: Option<S
     tokio::task::spawn_blocking(move || {
         let book_id = protocol::hash(&bytes);
         let cache_dir = paths::directory(&app, "cache")?;
+        let books_dir = paths::directory(&app, "books")?;
         let dest_path = cache_dir.join(format!("{}.txt", book_id));
         std::fs::write(&dest_path, &bytes).map_err(|error| format!("cannot cache imported source: {error}"))?;
 
         let novel = reader::parse_txt(&bytes, title.as_deref()).map_err(|e| e.to_string())?;
         let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::save(&conn, &novel, "TXT")?;
+        storage::save(&conn, &novel, "TXT", &books_dir)?;
         let validation = review::inspect(&conn, &book_id, &novel.sections)?;
 
         Ok(NovelImportResult { novel, validation })
@@ -157,8 +159,9 @@ async fn import_txt_bytes(app: tauri::AppHandle, bytes: Vec<u8>, title: Option<S
 async fn delete_novel(app: tauri::AppHandle, id: String) -> Result<(), String> {
     tokio::task::spawn_blocking(move || {
         let cache_dir = paths::directory(&app, "cache")?;
+        let books_dir = paths::directory(&app, "books")?;
         let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::delete(&conn, &id, &cache_dir)
+        storage::delete(&conn, &id, &cache_dir, &books_dir)
     })
     .await
     .map_err(|e| format!("后台删除失败: {}", e))?
@@ -177,8 +180,9 @@ async fn load_book_summaries(app: tauri::AppHandle) -> Result<Vec<protocol::Book
 #[tauri::command]
 async fn load_novel(app: tauri::AppHandle, id: String) -> Result<Option<protocol::Novel>, String> {
     tokio::task::spawn_blocking(move || {
+        let books_dir = paths::directory(&app, "books")?;
         let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::load(&conn, &id)
+        storage::load(&conn, &id, &books_dir)
     })
     .await
     .map_err(|e| format!("后台读取小说详情失败: {}", e))?
@@ -187,8 +191,9 @@ async fn load_novel(app: tauri::AppHandle, id: String) -> Result<Option<protocol
 #[tauri::command]
 async fn load_novels(app: tauri::AppHandle) -> Result<Vec<protocol::Novel>, String> {
     tokio::task::spawn_blocking(move || {
+        let books_dir = paths::directory(&app, "books")?;
         let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::all(&conn)
+        storage::all(&conn, &books_dir)
     })
     .await
     .map_err(|e| format!("后台读取全部小说失败: {}", e))?
@@ -197,8 +202,9 @@ async fn load_novels(app: tauri::AppHandle) -> Result<Vec<protocol::Novel>, Stri
 #[tauri::command]
 async fn inspect_novel(app: tauri::AppHandle, id: String) -> Result<NovelImportResult, String> {
     tokio::task::spawn_blocking(move || {
+        let books_dir = paths::directory(&app, "books")?;
         let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        let novel = storage::load(&conn, &id)?.ok_or("book no longer exists")?;
+        let novel = storage::load(&conn, &id, &books_dir)?.ok_or("book no longer exists")?;
         let validation = review::inspect(&conn, &id, &novel.sections)?;
         Ok(NovelImportResult { novel, validation })
     })
@@ -214,8 +220,9 @@ async fn update_novel_sections(
     retained: Vec<String>,
 ) -> Result<protocol::NovelValidation, String> {
     tokio::task::spawn_blocking(move || {
+        let books_dir = paths::directory(&app, "books")?;
         let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::update(&conn, &book_id, &sections, &retained)
+        storage::update(&conn, &book_id, &sections, &retained, &books_dir)
     })
     .await
     .map_err(|e| format!("后台更新章节失败: {}", e))?

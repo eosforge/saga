@@ -16,6 +16,7 @@
 | 2026-10-20 | ICON-03：裁切母版，去除导出留白，保留透明圆角，使侧边栏渲染遵循资产轮廓。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-20-filled-icons/result.json) |
 | 2026-10-20 | READ-01：三个阅读工具栏图标、字号设置及依音频状态显示的伴读控件。TXT 隐藏伴读条；.saga 导入与真实播放尚未实现。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-20-reader/result.json) |
 | 2026-10-20 | DOC-01：筛选八份已引用的证据结果，将临时产物移出追踪，并在获批的修正提交前校准项目文档与术语。 | [治理](documentation_CN.md)、[维护](maintenance_CN.md) |
+| 2026-10-20 | STORE-01：256 KB 章节分块段式存储、SQLite 纯索引切片、阅读进度同步及书架工具栏精简布局。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-20T09-37-13-999Z-f9b0218c/receipt.json) |
 
 ## 历史归档
 

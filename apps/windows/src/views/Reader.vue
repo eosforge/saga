@@ -49,6 +49,7 @@ function dismiss(event: PointerEvent): void {
 const renderedChapters = ref<Section[]>([]);
 const isAppending = ref(false);
 const isPrepending = ref(false);
+const isJumping = ref(false);
 
 function scrollToTop(): void {
   if (readerViewportRef.value) {
@@ -86,12 +87,7 @@ function selectSentence(index: number): void {
 
 function selectChapterSentence(sec: Section, chunkIndex: number): void {
   if (activeBook.value && activeBook.value.currentChapterIndex !== sec.index) {
-    activeBook.value.currentChapterIndex = sec.index;
-    const s = activeBook.value.sections?.[sec.index];
-    if (s) {
-      activeBook.value.currentChapter = s.title;
-      activeBook.value.sentences = contents(s);
-    }
+    void setBookChapter(activeBook.value.id, sec.index);
   }
   activeSentenceIndex.value = chunkIndex;
 }
@@ -109,16 +105,8 @@ async function onSelectChapter(index: number): Promise<void> {
   const sections = activeBook.value.sections;
   if (!sections[index]) return;
 
+  isJumping.value = true;
   await setBookChapter(activeBook.value.id, index);
-
-  const el = readerViewportRef.value;
-  if (el) {
-    const existingBlock = el.querySelector<HTMLElement>(`[data-chapter-index="${index}"]`);
-    if (existingBlock) {
-      existingBlock.scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
-    }
-  }
 
   // Pre-load surrounding window so upward and downward continuous scrolling works instantly
   const windowToRender: Section[] = [];
@@ -132,6 +120,7 @@ async function onSelectChapter(index: number): Promise<void> {
 
   renderedChapters.value = windowToRender;
   nextTick(() => {
+    const el = readerViewportRef.value;
     if (el) {
       const targetBlock = el.querySelector<HTMLElement>(`[data-chapter-index="${index}"]`);
       if (targetBlock) {
@@ -140,6 +129,9 @@ async function onSelectChapter(index: number): Promise<void> {
         el.scrollTop = 0;
       }
     }
+    setTimeout(() => {
+      isJumping.value = false;
+    }, 50);
   });
 }
 
@@ -219,16 +211,12 @@ function updateCurrentChapterFromScroll(): void {
   }
 
   if (currentSecIdx !== null && activeBook.value.currentChapterIndex !== currentSecIdx) {
-    activeBook.value.currentChapterIndex = currentSecIdx;
-    const sec = activeBook.value.sections[currentSecIdx];
-    if (sec) {
-      activeBook.value.currentChapter = sec.title;
-      activeBook.value.sentences = contents(sec);
-    }
+    void setBookChapter(activeBook.value.id, currentSecIdx);
   }
 }
 
 function handleViewportScroll(): void {
+  if (isJumping.value) return;
   const el = readerViewportRef.value;
   if (!el || !activeBook.value?.sections) return;
 

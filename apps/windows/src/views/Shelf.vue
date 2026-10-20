@@ -305,34 +305,14 @@ onUnmounted(() => {
         <span class="toast-text">{{ toastMessage }}</span>
       </div>
     </transition>
-    <!-- Top Action Header -->
-    <header class="shelf-header">
-      <div class="header-left">
-        <h1 class="page-title">我的书架</h1>
-        <span class="book-count-badge">{{ books.length }} 本书籍</span>
-      </div>
-      <div class="header-right">
-        <div class="search-box">
-          <span class="search-icon">🔍</span>
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="搜索书名、作者..."
-            class="search-input"
-          />
-        </div>
-        <button class="import-action-btn" @click="triggerFileImport">
-          📥 导入本地书籍
-        </button>
-        <input
-          ref="fileInputRef"
-          type="file"
-          accept=".txt"
-          class="hidden-file-input"
-          @change="handleFileSelected"
-        />
-      </div>
-    </header>
+    <!-- Hidden File Input for Native / Browser Picking -->
+    <input
+      ref="fileInputRef"
+      type="file"
+      accept=".txt"
+      class="hidden-file-input"
+      @change="handleFileSelected"
+    />
 
     <!-- Hero Card: Continue Reading Focus (shown when activeBook exists) -->
     <section v-if="activeBook" class="hero-section">
@@ -379,25 +359,6 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <!-- Empty Shelf Guide (shown when no books exist) -->
-    <section v-else class="hero-empty-section">
-      <div class="empty-shelf-card">
-        <div class="empty-shelf-icon-wrap">
-          <span class="empty-icon">📚</span>
-        </div>
-        <div class="empty-shelf-info">
-          <h2 class="empty-shelf-title">书架暂无书籍</h2>
-          <p class="empty-shelf-desc">
-            Saga 采用本地优先（Local-First）存储架构，无外部网络依赖，纯本地物理与数据库落盘。<br />
-            您可以直接拖拽本地 <strong>.txt / .epub</strong> 文件到窗口任意区域，或点击下方按钮开始导入。
-          </p>
-          <button class="empty-import-action-btn" @click="triggerFileImport">
-            📥 导入本地小说 (TXT)
-          </button>
-        </div>
-      </div>
-    </section>
-
     <!-- Filter Tabs -->
     <div class="filter-row">
       <div class="filter-tabs">
@@ -423,7 +384,15 @@ onUnmounted(() => {
           已读完
         </button>
       </div>
-      <div class="drop-hint">支持直接拖拽 TXT 到窗口导入</div>
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="搜索书名、作者..."
+          class="search-input"
+        />
+      </div>
     </div>
 
     <!-- Books Grid -->
@@ -792,12 +761,7 @@ onUnmounted(() => {
   line-height: 1.6;
   color: #94a3b8;
   margin-bottom: 16px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 620px;
+  white-space: pre-line;
 }
 
 .hero-progress-block {
@@ -939,6 +903,9 @@ onUnmounted(() => {
 .book-card {
   display: flex;
   flex-direction: column;
+  min-height: 320px;
+  height: 100%;
+  box-sizing: border-box;
   background: #1e293b;
   border: 1px solid #334155;
   border-radius: 12px;
@@ -1045,6 +1012,7 @@ onUnmounted(() => {
 }
 
 .card-meta {
+  flex: 1;
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -1067,6 +1035,8 @@ onUnmounted(() => {
 }
 
 .card-progress-row {
+  margin-top: auto;
+  padding-top: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1093,7 +1063,9 @@ onUnmounted(() => {
 }
 
 .add-card {
-  height: 270px;
+  min-height: 320px;
+  height: 100%;
+  box-sizing: border-box;
   border: 2px dashed #334155;
   border-radius: 12px;
   display: flex;

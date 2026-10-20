@@ -16,6 +16,7 @@ The linked documents own current facts. Earlier results describe their original 
 | 2026-10-20 | ICON-03: cropped the master, removed export padding, retained transparent corners, and aligned sidebar rendering with the asset silhouette. | [Architecture](architecture.md), [receipt](evidence/2026-10-20-filled-icons/result.json) |
 | 2026-10-20 | READ-01: three reader toolbar icons, font settings, and audio-dependent read-along controls. TXT hides read-along bars; .saga import and real playback remain unimplemented. | [Architecture](architecture.md), [receipt](evidence/2026-10-20-reader/result.json) |
 | 2026-10-20 | DOC-01: selected eight cited evidence results, removed transient artifacts from tracking, and reconciled project documentation and terminology before the authorized amendment. | [Governance](documentation.md), [maintenance](maintenance.md) |
+| 2026-10-20 | STORE-01: segmented 256 KB chapter packfile storage, index-only SQLite sections, progress synchronization, and streamlined shelf toolbar layout. | [Architecture](architecture.md), [receipt](evidence/2026-10-20T09-37-13-999Z-f9b0218c/receipt.json) |
 
 ## Historical archive
 

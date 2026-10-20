@@ -34,11 +34,11 @@ apps/windows/native/icons/source.png is the shared master for PNG/ICO/ICNS and b
 ## Data flow and limits
 
 1. The native picker returns a TXT path. Import reads bytes, computes BLAKE3 identity, caches the original file, decodes text, and selects chapter boundaries.
-2. SQLite stores metadata, ordered sections, and retained review fingerprints. Reimport replaces metadata/sections in one transaction. Review saves commit sections and decisions together.
+2. SQLite stores book metadata, ordered section indices and chunk offsets, and retained review fingerprints. Chapter text is packed into 256 KB atomic chunk files under books/<book-id>/. Reimport replaces metadata and chunks in one transaction. Review saves commit sections and decisions together.
 3. The shelf loads summaries first and sections on selection. Repeated requests share a pending load. Catalog object identity prevents a late response from overwriting reimport or reviving a deleted book.
 4. Reading derives sentence chunks when persisted chunks are absent. Browser preview keeps the entire TXT as one transient in-memory section without native parsing.
 
-Debug data is under data/ in the compiled checkout. Packaged builds use the OS application-local data directory. The layout is storage/saga.db and cache/<book-id>.txt. Moving a checkout requires rebuilding the debug binary; an existing binary retains its compile-time source location.
+Debug data is under data/ in the compiled checkout. Packaged builds use the OS application-local data directory. The layout is storage/saga.db, cache/<book-id>.txt, and books/<book-id>/<chunk-index>.chunk. Moving a checkout requires rebuilding the debug binary; an existing binary retains its compile-time source location.
 
 SQLite and the raw cache are separate resources. Import/delete are not distributed transactions, and power-loss durability remains unqualified. [Maintenance](maintenance.md) defines failure guarantees and local-only evidence references. This cleanup did not move or reparse existing development data.
 

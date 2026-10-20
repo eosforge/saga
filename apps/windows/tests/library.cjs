@@ -123,3 +123,32 @@ test("audio availability follows nonempty loaded audio resources of the selected
     assert.equal(store.hasAudio.value, false);
   } finally { store.pause(); }
 });
+
+test("selecting chapters updates reading progress percentage and lastRead status", async () => {
+  const store = loader()("stores/library.ts");
+  const total = 3167;
+  const sections = Array.from({ length: total }, (_, index) => ({
+    id: `book:${index}`,
+    index,
+    title: `第${index + 1}章`,
+    volume: "正文",
+    body: "测试正文。",
+    chunks: []
+  }));
+  store.importNovel({
+    book: { id: "book", title: "修真聊天群", author: "圣骑士的传说", description: "", chapters: total },
+    sections
+  });
+  const book = store.activeBook.value;
+  assert.equal(book.progress, 0);
+
+  await store.setBookChapter("book", 300);
+  assert.equal(book.currentChapterIndex, 300);
+  assert.equal(book.currentChapter, "第301章");
+  assert.equal(book.progress, Math.round((301 / total) * 100));
+  assert.equal(book.lastRead, "最近阅读");
+
+  await store.setBookChapter("book", total - 1);
+  assert.equal(book.currentChapterIndex, total - 1);
+  assert.equal(book.progress, 100);
+});

@@ -103,65 +103,71 @@ mod tests {
         .unwrap()
     }
 
-    fn setup() -> (Connection, protocol::Novel) {
+    fn setup() -> (Connection, protocol::Novel, std::path::PathBuf) {
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let temp_dir = std::env::temp_dir().join(format!("saga-review-test-{}-{}", std::process::id(), stamp));
+        std::fs::create_dir_all(&temp_dir).unwrap();
         let conn = Connection::open_in_memory().unwrap();
         storage::initialize(&conn).unwrap();
         let novel = sample();
-        storage::save(&conn, &novel, "TXT").unwrap();
-        (conn, novel)
+        storage::save(&conn, &novel, "TXT", &temp_dir).unwrap();
+        (conn, novel, temp_dir)
     }
 
-    fn keep(conn: &Connection, novel: &protocol::Novel) -> String {
+    fn keep(conn: &Connection, novel: &protocol::Novel, books_dir: &std::path::Path) -> String {
         let report = inspect(conn, &novel.book.id, &novel.sections).unwrap();
         assert_eq!(report.anomalies.len(), 1);
         let key = report.anomalies[0].key.clone();
-        storage::update(conn, &novel.book.id, &novel.sections, std::slice::from_ref(&key)).unwrap();
+        storage::update(conn, &novel.book.id, &novel.sections, std::slice::from_ref(&key), books_dir).unwrap();
         key
     }
 
     #[test]
     fn retain_preserves_text_and_survives_reimport_without_erasing_the_finding() {
-        let (conn, novel) = setup();
-        keep(&conn, &novel);
-        storage::save(&conn, &novel, "TXT").unwrap();
-        assert_eq!(storage::load(&conn, &novel.book.id).unwrap().unwrap(), novel);
+        let (conn, novel, dir) = setup();
+        keep(&conn, &novel, &dir);
+        storage::save(&conn, &novel, "TXT", &dir).unwrap();
+        assert_eq!(storage::load(&conn, &novel.book.id, &dir).unwrap().unwrap(), novel);
         let report = inspect(&conn, &novel.book.id, &novel.sections).unwrap();
         assert!(!report.is_valid);
         assert!(report.anomalies[0].retained);
         assert!(!inspect(&conn, "other", &novel.sections).unwrap().anomalies[0].retained);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn changed_title_body_or_previous_context_requires_review_again() {
         for field in 0..3 {
-            let (conn, mut novel) = setup();
-            let stale = keep(&conn, &novel);
+            let (conn, mut novel, dir) = setup();
+            let stale = keep(&conn, &novel, &dir);
             match field {
                 0 => novel.sections[1].title.push_str(" 修订"),
                 1 => novel.sections[1].body.push_str("新内容。"),
                 _ => novel.sections[0].body.push_str("前文变化。"),
             }
-            let report = storage::update(&conn, &novel.book.id, &novel.sections, &[stale]).unwrap();
+            let report = storage::update(&conn, &novel.book.id, &novel.sections, &[stale], &dir).unwrap();
             assert!(!report.anomalies[0].retained);
             assert_eq!(conn.query_row("SELECT COUNT(*) FROM reviews", [], |row| row.get::<_, i64>(0)).unwrap(), 0);
+            let _ = std::fs::remove_dir_all(&dir);
         }
     }
 
     #[test]
     fn revocation_and_failed_commit_preserve_the_correct_decisions() {
-        let (conn, mut novel) = setup();
-        keep(&conn, &novel);
+        let (conn, mut novel, dir) = setup();
+        keep(&conn, &novel, &dir);
         let original = novel.clone();
         conn.execute_batch("CREATE TRIGGER reject_review BEFORE DELETE ON reviews BEGIN SELECT RAISE(ABORT, 'review failure'); END;")
             .unwrap();
         novel.sections[1].body.push_str("本次修改应当回滚。");
-        assert!(storage::update(&conn, &novel.book.id, &novel.sections, &[]).is_err());
-        assert_eq!(storage::load(&conn, &novel.book.id).unwrap().unwrap(), original);
+        assert!(storage::update(&conn, &novel.book.id, &novel.sections, &[], &dir).is_err());
+        assert_eq!(storage::load(&conn, &novel.book.id, &dir).unwrap().unwrap(), original);
         assert!(inspect(&conn, &novel.book.id, &original.sections).unwrap().anomalies[0].retained);
         conn.execute_batch("DROP TRIGGER reject_review").unwrap();
-        let report = storage::update(&conn, &novel.book.id, &original.sections, &[]).unwrap();
+        let report = storage::update(&conn, &novel.book.id, &original.sections, &[], &dir).unwrap();
         assert!(!report.anomalies[0].retained);
-        assert!(storage::update(&conn, "missing", &novel.sections, &[]).is_err());
+        assert!(storage::update(&conn, "missing", &novel.sections, &[], &dir).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -169,23 +175,27 @@ mod tests {
     fn original_book_retains_only_the_two_reviewed_numbering_conflicts() {
         let bytes = std::fs::read(std::env::var_os("SAGA_SAMPLE").expect("SAGA_SAMPLE required")).unwrap();
         let novel = reader::parse_txt(&bytes, None).unwrap();
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let dir = std::env::temp_dir().join(format!("saga-review-sample-{}-{}", std::process::id(), stamp));
+        std::fs::create_dir_all(&dir).unwrap();
         let conn = Connection::open_in_memory().unwrap();
         storage::initialize(&conn).unwrap();
-        storage::save(&conn, &novel, "TXT").unwrap();
+        storage::save(&conn, &novel, "TXT", &dir).unwrap();
         let report = inspect(&conn, &novel.book.id, &novel.sections).unwrap();
         assert!(report.warnings.is_empty());
         assert_eq!(report.anomalies.len(), 2);
         assert_eq!(report.anomalies[0].title, "第2656章 我就知道遇上霸宋不会有好事");
         assert_eq!(report.anomalies[1].title, "第2680章 长生柱：虚日柱！");
         let keys: Vec<String> = report.anomalies.iter().map(|item| item.key.clone()).collect();
-        let partial = storage::update(&conn, &novel.book.id, &novel.sections, &keys[..1]).unwrap();
+        let partial = storage::update(&conn, &novel.book.id, &novel.sections, &keys[..1], &dir).unwrap();
         assert!(partial.anomalies[0].retained);
         assert!(!partial.anomalies[1].retained);
-        storage::update(&conn, &novel.book.id, &novel.sections, &keys).unwrap();
-        storage::save(&conn, &novel, "TXT").unwrap();
+        storage::update(&conn, &novel.book.id, &novel.sections, &keys, &dir).unwrap();
+        storage::save(&conn, &novel, "TXT", &dir).unwrap();
         let final_report = inspect(&conn, &novel.book.id, &novel.sections).unwrap();
         assert!(final_report.anomalies.iter().all(|item| item.retained));
-        assert_eq!(storage::load(&conn, &novel.book.id).unwrap().unwrap(), novel);
+        assert_eq!(storage::load(&conn, &novel.book.id, &dir).unwrap().unwrap(), novel);
+        let _ = std::fs::remove_dir_all(&dir);
         println!(
             "sample_bytes={} sections={} retained=2 pending=0 original_sections_unchanged=true",
             bytes.len(),
@@ -197,19 +207,22 @@ mod tests {
     fn retain_survives_closing_and_reopening_the_database() {
         let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
         let path = std::env::temp_dir().join(format!("saga-review-{}-{}.db", std::process::id(), stamp));
+        let dir = std::env::temp_dir().join(format!("saga-review-reopen-{}-{}", std::process::id(), stamp));
+        std::fs::create_dir_all(&dir).unwrap();
         let novel = sample();
         {
             let conn = Connection::open(&path).unwrap();
             storage::initialize(&conn).unwrap();
-            storage::save(&conn, &novel, "TXT").unwrap();
-            keep(&conn, &novel);
+            storage::save(&conn, &novel, "TXT", &dir).unwrap();
+            keep(&conn, &novel, &dir);
         }
         {
             let conn = Connection::open(&path).unwrap();
             storage::initialize(&conn).unwrap();
-            let loaded = storage::load(&conn, &novel.book.id).unwrap().unwrap();
+            let loaded = storage::load(&conn, &novel.book.id, &dir).unwrap().unwrap();
             assert!(inspect(&conn, &novel.book.id, &loaded.sections).unwrap().anomalies[0].retained);
         }
         std::fs::remove_file(path).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -302,9 +302,6 @@ pub fn extract_metadata(text: &str, title_hint: Option<&str>) -> (String, String
     for line in text.lines().take(60) {
         let trimmed = line.trim();
         if trimmed.is_empty() {
-            if desc_collecting && !desc_lines.is_empty() {
-                desc_collecting = false;
-            }
             continue;
         }
 
@@ -357,10 +354,7 @@ pub fn extract_metadata(text: &str, title_hint: Option<&str>) -> (String, String
     }
 
     if !desc_lines.is_empty() {
-        description = desc_lines.join(" ");
-        if description.chars().count() > 300 {
-            description = description.chars().take(300).collect::<String>() + "…";
-        }
+        description = desc_lines.join("\n");
     }
 
     if title.is_empty() {
@@ -547,16 +541,16 @@ mod tests {
 
     #[test]
     fn test_author_and_description_extraction() {
-        let text = r#"
-《凡人修仙传》
-作者：忘语
-简介：一个普通的山村穷小子，偶然之下跨入到一个江湖小门派，成了一名记名弟子。
-第一章 山村少年
-二愣子坐在石头上。
-"#;
-        let novel = parse_txt_str(text, "mock_id", Some("《凡人修仙传》作者：忘语")).unwrap();
+        let long_para = "这是一个普通的山村穷小子，偶然之下跨入到一个江湖小门派，成了一名记名弟子。".repeat(10);
+        let text = format!(
+            "《凡人修仙传》\n作者：忘语\n简介：{}\n\n第二段简介内容，中间隔了空行也应当完整保留。\n第一章 山村少年\n二愣子坐在石头上。\n",
+            long_para
+        );
+        let novel = parse_txt_str(&text, "mock_id", Some("《凡人修仙传》作者：忘语")).unwrap();
         assert_eq!(novel.book.title, "凡人修仙传");
         assert_eq!(novel.book.author, "忘语");
-        assert!(novel.book.description.contains("一个普通的山村穷小子"));
+        assert!(novel.book.description.chars().count() > 350);
+        assert!(!novel.book.description.ends_with('…'));
+        assert!(novel.book.description.contains("第二段简介内容，中间隔了空行也应当完整保留。"));
     }
 }
