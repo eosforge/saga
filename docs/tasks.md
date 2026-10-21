@@ -15,6 +15,7 @@ This ledger owns active deliverables and qualification gaps. Completed milestone
 | TASK-05 | tools, packages/speech | OPEN | 2026-10-18 | SpeechProvider support for cloud services (Edge-TTS, OpenAI/Minimax) and local endpoints (CosyVoice/GPT-SoVITS). | Verify generation and sentence alignment with both default Edge-TTS and a local mock/OpenAI-compatible speech endpoint. |
 | TASK-06 | protocol, packages/storage | OPEN | 2026-10-19 | The storage engine and compact .sgtl timeline in Proposal 2. | Round-trip binary serialization, over 95% compression versus JSON, and an O(1) chapter-seek benchmark. |
 | TASK-07 | Repository cleanup | IMPLEMENTED; LOCAL VERIFICATION | 2026-10-20 | CLEAN-01 storage/error fixes, portable paths, sentence/lifecycle consolidation, local checks, and documentation. | [Contracts and evidence](maintenance.md). Formal qualification remains GAP-04. |
+| TASK-08 | protocol, apps/windows/native | IMPLEMENTED; LOCAL VERIFICATION | 2026-10-21 | The .saga package format, manifest engine, and single-file library persistence. | Deterministic ZIP container creation/reading, SGMF binary manifest round-trip, O(1) section seek, <= 256 KB text chunk Deflate streaming, and pure single-file .saga on-disk storage without folder unpacking. |
 
 ## Gaps and remaining verification
 

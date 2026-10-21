@@ -10,8 +10,8 @@ import type { NovelValidation } from "../../../../protocol/bindings/NovelValidat
 
 /** Metadata and transient reading state; absent sections mean not yet loaded. */
 export interface BookItem extends Book {
-  /** Stored format label; new imports currently support TXT only. */
-  format: "TXT" | "EPUB";
+  /** Stored format label; TXT or native SAGA package. */
+  format: "TXT" | "SAGA";
   /** Reserved percentage; durable reading progress is not implemented. */
   progress: number;
   /** Session provenance label, not a durable read timestamp. */
@@ -39,6 +39,19 @@ export const speechRate = ref(1.0);
 export const failure = ref("");
 export const activeAuditReport = ref<NovelValidation | null>(null);
 export const activeAuditNovel = ref<Novel | null>(null);
+
+const STORED_BANNER_KEY = "saga_shelf_show_hero_banner";
+export const showHeroBanner = ref<boolean>(
+  typeof localStorage !== "undefined"
+    ? localStorage.getItem(STORED_BANNER_KEY) !== "false"
+    : true
+);
+
+watch(showHeroBanner, (val) => {
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem(STORED_BANNER_KEY, String(val));
+  }
+});
 
 /** Selected catalog entry, with an initial first-book fallback. */
 export const activeBook = computed<BookItem | null>(() => books.value.find((book) => book.id === activeBookId.value) || books.value[0] || null);
@@ -151,7 +164,7 @@ export function prevChapter(): void {
 }
 
 /** Publish a persisted native import or an explicitly transient preview. */
-export function importNovel(novel: Novel, format: "TXT" | "EPUB" = "TXT"): BookItem {
+export function importNovel(novel: Novel, format: "TXT" | "SAGA" = "TXT"): BookItem {
   pause();
   const book: BookItem = {
     ...novel.book, format, progress: 0, lastRead: isTauri() ? "本地导入" : "浏览器临时预览",
@@ -166,7 +179,7 @@ export function importNovel(novel: Novel, format: "TXT" | "EPUB" = "TXT"): BookI
 }
 
 /** Preview the entire browser TXT as one section, without native parsing or persistence. */
-export function importBook(title: string, author: string, format: "TXT", body = ""): void {
+export function importBook(title: string, author: string, format: "TXT" | "SAGA" = "TXT", body = ""): void {
   const id = crypto.randomUUID();
   importNovel({
     book: { id, title, author: author || "未知作者", description: "", chapters: 1 },
@@ -236,7 +249,7 @@ export async function loadStoredNovels(): Promise<void> {
       if (books.value.some((book) => book.id === summary.id)) continue;
       books.value.push({
         id: summary.id, title: summary.title, author: summary.author, description: summary.description,
-        chapters: summary.chapters, format: summary.format === "EPUB" ? "EPUB" : "TXT", progress: 0,
+        chapters: summary.chapters, format: summary.format === "SAGA" ? "SAGA" : "TXT", progress: 0,
         lastRead: "本地数据库", coverGradient: "linear-gradient(135deg, #1e3a8a 0%, #312e81 100%)",
         currentChapter: summary.first_chapter || "正文", currentChapterIndex: 0, sentences: []
       });

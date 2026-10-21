@@ -17,6 +17,10 @@
 | 2026-10-20 | READ-01：三个阅读工具栏图标、字号设置及依音频状态显示的伴读控件。TXT 隐藏伴读条；.saga 导入与真实播放尚未实现。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-20-reader/result.json) |
 | 2026-10-20 | DOC-01：筛选八份已引用的证据结果，将临时产物移出追踪，并在获批的修正提交前校准项目文档与术语。 | [治理](documentation_CN.md)、[维护](maintenance_CN.md) |
 | 2026-10-20 | STORE-01：256 KB 章节分块段式存储、SQLite 纯索引切片、阅读进度同步及书架工具栏精简布局。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-20T09-37-13-999Z-f9b0218c/receipt.json) |
+| 2026-10-20 | STORE-02：多章整体 Deflate 压缩分块严格限制于 256 KB、无重复试压流式贪心打包及按块缓存解压。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-20T10-54-23-331Z-ba198f65/receipt.json) |
+| 2026-10-21 | SPEC-01：定义 .saga 标准 ZIP 容器规范，包含二进制清单、256 KB 正文切片及懒加载伴读时间轴。 | [架构](architecture_CN.md)、[任务台账](tasks_CN.md) |
+| 2026-10-21 | PKG-01：接入 .saga ZIP 容器格式、原生导入导出引擎、修复阅读视口章节错位并支持无缝拖拽导入。 | [架构](architecture_CN.md)、[任务台账](tasks_CN.md) |
+| 2026-10-21 | PKG-02：纯单文件 .saga 磁盘存储架构（无目录解压）、全内存切片打包入库，并彻底清除历史兼容回退代码。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-21T09-40-46-764Z-64234f34/receipt.json) |
 
 ## 历史归档
 

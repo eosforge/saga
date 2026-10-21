@@ -44,6 +44,7 @@ const renderedSections = ref<Section[]>([]);
 const activePopoverSection = ref<Section | null>(null);
 const editTitle = ref("");
 const editVolume = ref("");
+const mergeIncludeTitle = ref(false);
 const readerPaperRef = ref<HTMLElement | null>(null);
 const isPrependingAudit = ref(false);
 const isAppendingAudit = ref(false);
@@ -212,6 +213,10 @@ function openPopoverForSection(sec: Section): void {
   );
   if (anomalyIdx !== -1) {
     selectedAnomalyIndex.value = anomalyIdx;
+    const anomaly = anomalies.value[anomalyIdx];
+    mergeIncludeTitle.value = anomaly.anomaly_type === "SuspiciousShortSection";
+  } else {
+    mergeIncludeTitle.value = false;
   }
 }
 
@@ -251,7 +256,9 @@ function advanceToNextUnresolved(): void {
   triggerRef(sections);
   const selected = anomalies.value[selectedAnomalyIndex.value];
   const position = sections.value.findIndex(section => section.id === selected?.initialSectionId);
-  syncRenderedWindow(Math.max(0, position));
+  if (position !== -1) {
+    syncRenderedWindow(position);
+  }
   const nextIdx = anomalies.value.findIndex(
     (a, idx) => idx > selectedAnomalyIndex.value && !resolvedMap.value[a.anomalyId]
   );
@@ -278,35 +285,42 @@ function handleDemoteToPrev(): void {
   const prev = sections.value[targetIdx - 1];
   const curr = sections.value[targetIdx];
 
-  const textToAdd = curr.body.trim()
-    ? `\n\n${curr.title}\n\n${curr.body}`
-    : `\n\n${curr.title}`;
-  prev.body += textToAdd;
-
-  if (curr.chunks && curr.chunks.length > 0) {
-    const baseP = prev.chunks.length > 0 ? prev.chunks[prev.chunks.length - 1].paragraph + 1 : 0;
-    prev.chunks.push(...curr.chunks.map((c, i) => ({
-      ...c,
-      id: `${prev.id}:p:${i}`,
-      chapter: prev.id,
-      paragraph: baseP + c.paragraph
-    })));
+  const includeTitle = mergeIncludeTitle.value;
+  let textToAdd = "";
+  if (includeTitle && curr.title.trim()) {
+    textToAdd = curr.body.trim()
+      ? `\n\n${curr.title.trim()}\n\n${curr.body.trim()}`
+      : `\n\n${curr.title.trim()}`;
+  } else {
+    textToAdd = curr.body.trim() ? `\n\n${curr.body.trim()}` : "";
   }
 
-  sections.value.splice(targetIdx, 1);
+  const updatedPrev: Section = {
+    ...prev,
+    body: prev.body + textToAdd,
+    chunks: [
+      ...prev.chunks,
+      ...(curr.chunks || []).map((c, i) => ({
+        ...c,
+        id: `${prev.id}:p:${i}`,
+        chapter: prev.id,
+        paragraph: (prev.chunks.length > 0 ? prev.chunks[prev.chunks.length - 1].paragraph + 1 : 0) + c.paragraph
+      }))
+    ]
+  };
 
-  const rIdx = renderedSections.value.findIndex(s => s.id === targetId);
-  if (rIdx !== -1) {
-    renderedSections.value.splice(rIdx, 1);
-  }
+  sections.value.splice(targetIdx - 1, 2, updatedPrev);
+  triggerRef(sections);
 
   const anomaly = anomalies.value.find(a => a.initialSectionId === targetId);
   if (anomaly) {
     resolvedMap.value[anomaly.anomalyId] = {
       action: "demoted_to_prev",
-      label: `已变回《${prev.title}》正文段落`
+      label: `已合并入《${prev.title}》`
     };
   }
+
+  syncRenderedWindow(Math.max(0, targetIdx - 1));
 
   closePopover();
   advanceToNextUnresolved();
@@ -324,36 +338,43 @@ function handleDemoteNext(): void {
   const next = sections.value[targetIdx + 1];
   const demotedTitle = next.title;
 
-  const addedText = next.body.trim()
-    ? `\n\n${next.title}\n\n${next.body}`
-    : `\n\n${next.title}`;
-  curr.body += addedText;
-
-  if (next.chunks && next.chunks.length > 0) {
-    const baseP = curr.chunks.length > 0 ? curr.chunks[curr.chunks.length - 1].paragraph + 1 : 0;
-    curr.chunks.push(...next.chunks.map((c, i) => ({
-      ...c,
-      id: `${curr.id}:next_p:${i}`,
-      chapter: curr.id,
-      paragraph: baseP + c.paragraph
-    })));
+  const includeTitle = mergeIncludeTitle.value;
+  let addedText = "";
+  if (includeTitle && next.title.trim()) {
+    addedText = next.body.trim()
+      ? `\n\n${next.title.trim()}\n\n${next.body.trim()}`
+      : `\n\n${next.title.trim()}`;
+  } else {
+    addedText = next.body.trim() ? `\n\n${next.body.trim()}` : "";
   }
+
+  const updatedCurr: Section = {
+    ...curr,
+    body: curr.body + addedText,
+    chunks: [
+      ...curr.chunks,
+      ...(next.chunks || []).map((c, i) => ({
+        ...c,
+        id: `${curr.id}:next_p:${i}`,
+        chapter: curr.id,
+        paragraph: (curr.chunks.length > 0 ? curr.chunks[curr.chunks.length - 1].paragraph + 1 : 0) + c.paragraph
+      }))
+    ]
+  };
 
   const nextId = next.id;
-  sections.value.splice(targetIdx + 1, 1);
-
-  const rNextIdx = renderedSections.value.findIndex(s => s.id === nextId);
-  if (rNextIdx !== -1) {
-    renderedSections.value.splice(rNextIdx, 1);
-  }
+  sections.value.splice(targetIdx, 2, updatedCurr);
+  triggerRef(sections);
 
   const anomaly = anomalies.value.find(a => a.initialSectionId === nextId);
   if (anomaly) {
     resolvedMap.value[anomaly.anomalyId] = {
       action: "demoted_next",
-      label: `已取消伪章节《${demotedTitle}》，正文已接续归入本章`
+      label: `已吸收《${demotedTitle}》正文`
     };
   }
+
+  syncRenderedWindow(targetIdx);
 
   closePopover();
   advanceToNextUnresolved();
@@ -820,6 +841,15 @@ watch(
             </button>
           </div>
 
+          <!-- Merge Options Toggle -->
+          <div class="popover-merge-options">
+            <label class="merge-checkbox-label" title="若被合并的章节标题实际是正文段落或对话，勾选此项可将标题作为段落一并拼接保留；若为重复章号标题，取消勾选将舍弃多余标题">
+              <input type="checkbox" v-model="mergeIncludeTitle" class="merge-checkbox" />
+              <span>合并时保留标题为正文段落</span>
+              <span class="merge-mode-hint">{{ mergeIncludeTitle ? '（含标题）' : '（舍弃多余标题，仅留正文）' }}</span>
+            </label>
+          </div>
+
           <!-- Chapter edit and review actions. -->
           <div class="popover-actions-grid">
             <!-- Action 1: Demote into previous chapter -->
@@ -827,10 +857,10 @@ watch(
               class="popover-action-btn btn-demote-prev"
               :disabled="getSectionIndex(activePopoverSection) <= 0"
               @click="handleDemoteToPrev"
-              title="将本章节取消分割，变回上一章正文段落（适用于对话、引言被误判为章节标题）"
+              title="将本章节取消独立切分，正文接续追加到上一章末尾"
             >
               <span class="btn-icon">↩</span>
-              <span class="btn-text">变回正文段落（合并入上一章）</span>
+              <span class="btn-text">合并入上一章{{ mergeIncludeTitle ? '（含标题）' : '（仅正文）' }}</span>
             </button>
 
             <!-- Action 2: Demote next chapter into this chapter -->
@@ -838,10 +868,10 @@ watch(
               class="popover-action-btn btn-demote-next"
               :disabled="getSectionIndex(activePopoverSection) >= sections.length - 1"
               @click="handleDemoteNext"
-              title="若紧随其后的下一行（如『3.5小时后……』）被误切成新章，将其取消切分并接续归入当前章"
+              title="将紧随其后的下一章取消切分，正文接续并入本章末尾"
             >
-              <span class="btn-icon">↩</span>
-              <span class="btn-text">取消此章切分（变回当前章正文段落）</span>
+              <span class="btn-icon">↪</span>
+              <span class="btn-text">合并下一章{{ mergeIncludeTitle ? '（含标题）' : '（仅正文）' }}</span>
             </button>
 
             <!-- Action 3: Delete Section -->
@@ -862,7 +892,7 @@ watch(
               title="保留原有标题和正文，并查看下一处；点击保存后生效"
             >
               <span class="btn-icon">👁️</span>
-              <span class="btn-text">保留</span>
+              <span class="btn-text">保留独立</span>
             </button>
             <button v-else class="popover-action-btn btn-accept" @click="restore">撤销保留</button>
           </div>
@@ -1514,6 +1544,39 @@ watch(
 
 .popover-btn.btn-rename:hover {
   background: #475569;
+}
+
+.popover-merge-options {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px dashed #334155;
+  border-radius: 8px;
+  margin-top: 10px;
+  margin-bottom: 6px;
+}
+
+.merge-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #cbd5e1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.merge-checkbox {
+  accent-color: #38bdf8;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.merge-mode-hint {
+  font-size: 12px;
+  color: #94a3b8;
 }
 
 .popover-actions-grid {

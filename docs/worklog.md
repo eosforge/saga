@@ -17,6 +17,10 @@ The linked documents own current facts. Earlier results describe their original 
 | 2026-10-20 | READ-01: three reader toolbar icons, font settings, and audio-dependent read-along controls. TXT hides read-along bars; .saga import and real playback remain unimplemented. | [Architecture](architecture.md), [receipt](evidence/2026-10-20-reader/result.json) |
 | 2026-10-20 | DOC-01: selected eight cited evidence results, removed transient artifacts from tracking, and reconciled project documentation and terminology before the authorized amendment. | [Governance](documentation.md), [maintenance](maintenance.md) |
 | 2026-10-20 | STORE-01: segmented 256 KB chapter packfile storage, index-only SQLite sections, progress synchronization, and streamlined shelf toolbar layout. | [Architecture](architecture.md), [receipt](evidence/2026-10-20T09-37-13-999Z-f9b0218c/receipt.json) |
+| 2026-10-20 | STORE-02: multi-chapter unified Deflate compression strictly bounded by 256 KB per chunk file, streaming greedy packing without recompression, and cached chunk decompression. | [Architecture](architecture.md), [receipt](evidence/2026-10-20T10-54-23-331Z-ba198f65/receipt.json) |
+| 2026-10-21 | SPEC-01: defined .saga standard ZIP container specification with binary manifest, 256 KB text slices, and lazy audio timeline. | [Architecture](architecture.md), [tasks](tasks.md) |
+| 2026-10-21 | PKG-01: integrated .saga ZIP container format, native import/export engine, fixed reader chapter desync, and enabled seamless drag-and-drop ingestion. | [Architecture](architecture.md), [tasks](tasks.md) |
+| 2026-10-21 | PKG-02: pure single-file .saga on-disk storage architecture without directory unpacking, in-memory chunk packaging, and elimination of legacy compatibility fallbacks. | [Architecture](architecture.md), [receipt](evidence/2026-10-21T09-40-46-764Z-64234f34/receipt.json) |
 
 ## Historical archive
 

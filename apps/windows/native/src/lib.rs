@@ -46,6 +46,23 @@ fn ingest(app: &tauri::AppHandle, path_str: String) -> Result<NovelImportResult,
     report("reading", "正在打开文件...", 0);
     let file_path = Path::new(&path_str);
     ingestion::validate(file_path)?;
+
+    let is_saga = file_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("saga"));
+
+    if is_saga {
+        report("reading", "正在验证 .saga 归档格式与签名...", 20);
+        let books_dir = paths::directory(app, "books")?;
+        let conn = storage::open(&paths::directory(app, "storage")?.join("saga.db"))?;
+        report("parsing", "正在解析 SGMF 调度元数据与章节分片...", 50);
+        report("persisting", "正在挂载书籍与章节索引...", 80);
+        let result = storage::import_saga(&conn, file_path, &books_dir)?;
+        report("completed", "导入完成", 100);
+        return Ok(result);
+    }
+
     let file = std::fs::File::open(file_path).map_err(|e| format!("打开文件失败: {}", e))?;
     let size = file.metadata().map_err(|e| format!("读取文件信息失败: {}", e))?.len();
     let bytes = ingestion::read(file, size, |done, total| {
@@ -61,10 +78,6 @@ fn ingest(app: &tauri::AppHandle, path_str: String) -> Result<NovelImportResult,
 
     report("hashing", "正在计算文件校验值...", 20);
     let book_id = protocol::hash(&bytes);
-    report("caching", "正在保存原始文件...", 25);
-    let cache_dir = paths::directory(app, "cache")?;
-    let dest_path = cache_dir.join(format!("{}.txt", book_id));
-    std::fs::write(&dest_path, &bytes).map_err(|e| format!("保存原始文件失败: {}", e))?;
 
     report("decoding", "正在识别文字编码...", 30);
     let decoded = reader::decode_bytes(&bytes).map_err(|e| e.to_string())?;
@@ -110,8 +123,8 @@ async fn pick_novel_file(window: tauri::Window) -> Result<Option<String>, String
     tauri::async_runtime::spawn_blocking(move || {
         rfd::FileDialog::new()
             .set_parent(&window)
-            .set_title("选择 TXT 小说")
-            .add_filter("TXT 小说", &["txt"])
+            .set_title("选择电子书文件")
+            .add_filter("支持的书籍文件 (*.txt, *.saga)", &["txt", "saga"])
             .pick_file()
             .map(|path| path.to_string_lossy().into_owned())
     })
@@ -139,10 +152,7 @@ async fn import_txt_bytes(app: tauri::AppHandle, bytes: Vec<u8>, title: Option<S
 
     tokio::task::spawn_blocking(move || {
         let book_id = protocol::hash(&bytes);
-        let cache_dir = paths::directory(&app, "cache")?;
         let books_dir = paths::directory(&app, "books")?;
-        let dest_path = cache_dir.join(format!("{}.txt", book_id));
-        std::fs::write(&dest_path, &bytes).map_err(|error| format!("cannot cache imported source: {error}"))?;
 
         let novel = reader::parse_txt(&bytes, title.as_deref()).map_err(|e| e.to_string())?;
         let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
@@ -158,10 +168,9 @@ async fn import_txt_bytes(app: tauri::AppHandle, bytes: Vec<u8>, title: Option<S
 #[tauri::command]
 async fn delete_novel(app: tauri::AppHandle, id: String) -> Result<(), String> {
     tokio::task::spawn_blocking(move || {
-        let cache_dir = paths::directory(&app, "cache")?;
         let books_dir = paths::directory(&app, "books")?;
         let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::delete(&conn, &id, &cache_dir, &books_dir)
+        storage::delete(&conn, &id, &books_dir)
     })
     .await
     .map_err(|e| format!("后台删除失败: {}", e))?
@@ -229,6 +238,17 @@ async fn update_novel_sections(
 }
 
 #[tauri::command]
+async fn export_novel_saga(app: tauri::AppHandle, book_id: String, output_path: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        let books_dir = paths::directory(&app, "books")?;
+        let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
+        storage::export_saga(&conn, &book_id, &books_dir, Path::new(&output_path))
+    })
+    .await
+    .map_err(|e| format!("后台导出任务异常: {}", e))?
+}
+
+#[tauri::command]
 fn storage_location(app: tauri::AppHandle) -> Result<String, String> {
     Ok(paths::root(&app)?.to_string_lossy().into_owned())
 }
@@ -249,7 +269,8 @@ pub fn run() {
             inspect_novel,
             load_book_summaries,
             load_novel,
-            load_novels
+            load_novels,
+            export_novel_saga
         ])
         .run(tauri::generate_context!())
         .expect("failed to execute saga desktop application");

@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use ts_rs::TS;
 
+pub mod package;
+pub use package::{PackageManifest, PackageManifestView, PackageSection};
+
 /// Protocol domain error representations.
 #[derive(Debug, Error)]
 pub enum ProtocolError {

@@ -16,6 +16,7 @@ import {
   loadStoredNovels,
   activeAuditReport,
   activeAuditNovel,
+  showHeroBanner,
   type BookItem
 } from "../stores/library";
 import type { NovelImportResult } from "../../../../protocol/bindings/NovelImportResult";
@@ -26,8 +27,6 @@ const emit = defineEmits<{
   (e: "open-audit"): void;
 }>();
 
-const currentFilter = ref<"all" | "reading" | "finished">("all");
-const searchQuery = ref("");
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const toastMessage = ref<string | null>(null);
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -53,19 +52,18 @@ function showToast(msg: string): void {
   }, 4000);
 }
 
-const filteredBooks = computed(() => {
-  return books.value.filter((b) => {
-    const matchesFilter =
-      currentFilter.value === "all" ||
-      (currentFilter.value === "reading" && b.progress > 0 && b.progress < 100) ||
-      (currentFilter.value === "finished" && b.progress >= 100);
+function getBookPriority(b: BookItem): number {
+  if (b.progress > 0 && b.progress < 100) return 0; // 正在读 (最高优)
+  if (b.progress === 0) return 1;                  // 未读 / 新上架
+  return 2;                                        // 已读完 (沉底)
+}
 
-    const matchesSearch =
-      !searchQuery.value ||
-      b.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      b.author.toLowerCase().includes(searchQuery.value.toLowerCase());
-
-    return matchesFilter && matchesSearch;
+const sortedBooks = computed(() => {
+  return books.value.slice().sort((a, b) => {
+    const pa = getBookPriority(a);
+    const pb = getBookPriority(b);
+    if (pa !== pb) return pa - pb;
+    return a.title.localeCompare(b.title, "zh-CN");
   });
 });
 
@@ -78,24 +76,7 @@ function handleHeroPlay(): void {
   togglePlay();
 }
 
-const inspecting = ref(false);
-
-async function inspect(id: string): Promise<void> {
-  if (inspecting.value || isImporting.value) return;
-  inspecting.value = true;
-  try {
-    const result = await invoke<NovelImportResult>("inspect_novel", { id });
-    activeAuditNovel.value = result.novel;
-    activeAuditReport.value = result.validation;
-    emit("open-audit");
-  } catch (error) {
-    showToast(`核验失败：${error}`);
-  } finally {
-    inspecting.value = false;
-  }
-}
-
-function handleImportResult(result: NovelImportResult, format: "TXT" | "EPUB" = "TXT"): void {
+function handleImportResult(result: NovelImportResult, format: "TXT" | "SAGA" = "TXT"): void {
   const { novel, validation } = result;
   importNovel(novel, format);
   isImporting.value = false;
@@ -189,7 +170,8 @@ async function importFilePath(path: string): Promise<void> {
     const result = await invoke<NovelImportResult>("import_txt_file", { path });
     if (disposed) return;
     importPercent.value = 100;
-    handleImportResult(result, "TXT");
+    const ext = fileName.split(".").pop()?.toUpperCase() || "TXT";
+    handleImportResult(result, ext === "SAGA" ? "SAGA" : "TXT");
   } catch (err) {
     console.error("Native import_txt_file failed:", err);
     showToast(`导入失败: ${err}`);
@@ -204,8 +186,8 @@ async function processImportedFile(file: File): Promise<void> {
   const dotIndex = fileName.lastIndexOf(".");
   const title = dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
   const ext = dotIndex > 0 ? fileName.substring(dotIndex + 1).toUpperCase() : "TXT";
-  if (ext !== "TXT") { showToast("目前仅支持 TXT 文件"); return; }
-  const format = "TXT";
+  if (ext !== "TXT" && ext !== "SAGA") { showToast("目前仅支持 TXT 与 .saga 文件"); return; }
+  const format = ext === "SAGA" ? "SAGA" : "TXT";
 
   try {
     isImporting.value = true;
@@ -269,7 +251,8 @@ onMounted(async () => {
         const paths = event.payload.paths;
         if (paths && paths.length > 0) {
           const targetPath = paths[0];
-          if (targetPath.toLowerCase().endsWith(".txt")) {
+          const lower = targetPath.toLowerCase();
+          if (lower.endsWith(".txt") || lower.endsWith(".saga")) {
             await importFilePath(targetPath);
           }
         }
@@ -309,18 +292,17 @@ onUnmounted(() => {
     <input
       ref="fileInputRef"
       type="file"
-      accept=".txt"
+      accept=".txt,.saga"
       class="hidden-file-input"
       @change="handleFileSelected"
     />
 
-    <!-- Hero Card: Continue Reading Focus (shown when activeBook exists) -->
-    <section v-if="activeBook" class="hero-section">
+    <!-- Hero Card: Continue Reading Focus (shown when activeBook exists and enabled in settings) -->
+    <section v-if="showHeroBanner && activeBook" class="hero-section">
       <div class="hero-card">
         <div class="hero-cover" :style="{ background: activeBook.coverGradient }">
           <div class="hero-cover-inner">
             <span class="hero-cover-char">{{ activeBook.title[0] || '书' }}</span>
-            <span class="hero-format-tag">{{ activeBook.format }}</span>
           </div>
         </div>
 
@@ -342,63 +324,46 @@ onUnmounted(() => {
 
           <div class="hero-actions">
             <button class="primary-read-btn" @click="handleOpenBook(activeBook.id)">
-              📖 进入阅读器
+              <svg class="btn-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+              </svg>
+              <span>继续阅读</span>
             </button>
             <button v-if="hasAudio" class="secondary-audio-btn" @click="handleHeroPlay">
-              {{ isPlaying ? "⏸ 暂停伴读" : "▶ 继续伴读" }}
+              <svg v-if="isPlaying" class="btn-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
+              <svg v-else class="btn-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              <span>{{ isPlaying ? "暂停伴读" : "继续伴读" }}</span>
             </button>
             <button
               class="hero-delete-btn"
               @click="promptDeleteBook(activeBook)"
               title="删除当前书籍 (清除本地缓存与数据库记录)"
             >
-              🗑️ 删除书籍
+              <svg class="btn-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
+              <span>删除书籍</span>
             </button>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Filter Tabs -->
-    <div class="filter-row">
-      <div class="filter-tabs">
-        <button
-          class="filter-tab"
-          :class="{ active: currentFilter === 'all' }"
-          @click="currentFilter = 'all'"
-        >
-          全部书籍 ({{ books.length }})
-        </button>
-        <button
-          class="filter-tab"
-          :class="{ active: currentFilter === 'reading' }"
-          @click="currentFilter = 'reading'"
-        >
-          正在阅读
-        </button>
-        <button
-          class="filter-tab"
-          :class="{ active: currentFilter === 'finished' }"
-          @click="currentFilter = 'finished'"
-        >
-          已读完
-        </button>
-      </div>
-      <div class="search-box">
-        <span class="search-icon">🔍</span>
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="搜索书名、作者..."
-          class="search-input"
-        />
-      </div>
-    </div>
+    <!-- Divider between Hero Banner and Books Grid -->
+    <div v-if="showHeroBanner && activeBook" class="shelf-divider"></div>
 
     <!-- Books Grid -->
     <div class="books-grid">
       <div
-        v-for="b in filteredBooks"
+        v-for="b in sortedBooks"
         :key="b.id"
         class="book-card"
         @click="handleOpenBook(b.id)"
@@ -408,24 +373,29 @@ onUnmounted(() => {
             class="card-delete-btn"
             @click.stop="promptDeleteBook(b, $event)"
             title="删除书籍 (清除本地缓存与数据库记录)"
+            aria-label="删除书籍"
           >
-            🗑️
+            <svg class="card-delete-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
           </button>
           <span class="card-cover-title">{{ b.title }}</span>
           <p v-if="b.description" class="card-cover-desc" :title="b.description">{{ b.description }}</p>
-          <span class="card-format-tag">{{ b.format }}</span>
           <div class="card-glow"></div>
         </div>
 
         <div class="card-meta">
           <h3 class="card-title" :title="b.title">{{ b.title }}</h3>
           <p class="card-author">{{ b.author }}</p>
-          <button class="filter-tab" :disabled="inspecting || isImporting" @click.stop="inspect(b.id)">核验</button>
           <div class="card-progress-row">
             <div class="card-progress-track">
               <div class="card-progress-thumb" :style="{ width: `${b.progress}%` }"></div>
             </div>
-            <span class="card-progress-num">{{ b.progress }}%</span>
+            <span class="card-progress-num">
+              {{ b.progress >= 100 ? '已读完' : b.progress > 0 ? `${b.progress}%` : '未读' }}
+            </span>
           </div>
         </div>
       </div>
@@ -434,7 +404,6 @@ onUnmounted(() => {
       <div class="add-card" @click="triggerFileImport">
         <div class="add-icon">＋</div>
         <span class="add-label">导入本地文件</span>
-        <span class="add-subtext">TXT</span>
       </div>
     </div>
 
@@ -488,7 +457,7 @@ onUnmounted(() => {
             <div class="delete-warning-box">
               <div class="warning-box-title">❗ 本地数据清除清单：</div>
               <ul class="warning-box-list">
-                <li>物理文本缓存文件：<code>data/cache/{{ bookToDelete.id }}.txt</code></li>
+                <li>书籍单文件归档：<code>data/books/{{ bookToDelete.id }}.saga</code></li>
                 <li>SQLite 数据库：<code>saga.db</code> 中关联的全部卷、章节与切片索引</li>
                 <li>此操作不可撤销，请谨慎操作。</li>
               </ul>
@@ -542,53 +511,6 @@ onUnmounted(() => {
   padding: 2px 10px;
   border-radius: 12px;
   border: 1px solid #334155;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.search-box {
-  display: flex;
-  align-items: center;
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  padding: 6px 12px;
-  gap: 8px;
-  width: 240px;
-}
-
-.search-input {
-  background: transparent;
-  border: none;
-  outline: none;
-  color: #f1f5f9;
-  font-size: 13px;
-  width: 100%;
-}
-
-.search-input::placeholder {
-  color: #64748b;
-}
-
-.import-action-btn {
-  background: #3b82f6;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.import-action-btn:hover {
-  background: #2563eb;
-  transform: translateY(-1px);
 }
 
 .hidden-file-input {
@@ -695,24 +617,14 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: center;
 }
 
 .hero-cover-char {
   font-size: 40px;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.9);
-}
-
-.hero-format-tag {
-  align-self: flex-start;
-  font-size: 11px;
-  font-weight: 700;
-  background: rgba(0, 0, 0, 0.4);
-  color: #38bdf8;
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: 1px solid rgba(56, 189, 248, 0.3);
 }
 
 .hero-details {
@@ -795,10 +707,15 @@ onUnmounted(() => {
 
 .hero-actions {
   display: flex;
+  align-items: center;
   gap: 12px;
 }
 
 .primary-read-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   background: #f59e0b;
   color: #0f172a;
   border: none;
@@ -806,6 +723,7 @@ onUnmounted(() => {
   padding: 10px 22px;
   font-size: 14px;
   font-weight: 700;
+  line-height: 1;
   cursor: pointer;
   transition: all 0.2s;
   box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
@@ -817,6 +735,10 @@ onUnmounted(() => {
 }
 
 .secondary-audio-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   background: #1e293b;
   border: 1px solid #475569;
   color: #e2e8f0;
@@ -824,6 +746,7 @@ onUnmounted(() => {
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -835,6 +758,10 @@ onUnmounted(() => {
 }
 
 .hero-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   background: #1e293b;
   border: 1px solid #475569;
   color: #94a3b8;
@@ -842,6 +769,7 @@ onUnmounted(() => {
   padding: 10px 18px;
   font-size: 14px;
   font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -852,40 +780,16 @@ onUnmounted(() => {
   color: #ef4444;
 }
 
-.filter-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+.btn-svg-icon {
+  flex-shrink: 0;
+  display: block;
 }
 
-.filter-tabs {
-  display: flex;
-  gap: 8px;
-}
-
-.filter-tab {
-  background: transparent;
-  border: 1px solid transparent;
-  color: #94a3b8;
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.filter-tab:hover {
-  color: #f1f5f9;
-  background: rgba(30, 41, 59, 0.6);
-  border-color: transparent;
-}
-
-.filter-tab.active {
-  background: #1e293b;
-  color: #38bdf8;
-  border-color: #334155;
+.shelf-divider {
+  height: 1px;
+  background: linear-gradient(90deg, rgba(51, 65, 85, 0.6) 0%, rgba(51, 65, 85, 0.15) 100%);
+  margin: 28px 0 24px;
+  border: none;
 }
 
 .drop-hint {
@@ -927,7 +831,8 @@ onUnmounted(() => {
   padding: 16px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 6px;
   overflow: hidden;
 }
 
@@ -937,6 +842,7 @@ onUnmounted(() => {
   right: 10px;
   width: 28px;
   height: 28px;
+  padding: 0;
   border-radius: 6px;
   background: rgba(15, 23, 42, 0.75);
   border: 1px solid rgba(239, 68, 68, 0.4);
@@ -944,13 +850,13 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
   cursor: pointer;
   z-index: 10;
   opacity: 0;
   transform: scale(0.85);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   backdrop-filter: blur(4px);
+  line-height: 1;
 }
 
 .book-card:hover .card-delete-btn {
@@ -962,8 +868,13 @@ onUnmounted(() => {
   background: #dc2626;
   border-color: #ef4444;
   color: #ffffff;
-  transform: scale(1.1);
+  transform: scale(1.08);
   box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+}
+
+.card-delete-svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 .card-cover-title {
@@ -988,18 +899,6 @@ onUnmounted(() => {
   z-index: 2;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
   pointer-events: none;
-}
-
-.card-format-tag {
-  align-self: flex-start;
-  font-size: 10px;
-  font-weight: 700;
-  background: rgba(15, 23, 42, 0.7);
-  color: #38bdf8;
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  z-index: 2;
 }
 
 .card-glow {
@@ -1092,11 +991,6 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 600;
   color: #e2e8f0;
-}
-
-.add-subtext {
-  font-size: 11px;
-  color: #64748b;
 }
 
 .shelf-toast {

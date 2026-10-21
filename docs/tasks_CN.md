@@ -15,6 +15,7 @@
 | TASK-05 | tools, packages/speech | OPEN | 2026-10-18 | SpeechProvider 支持云服务（Edge-TTS、OpenAI/Minimax）及本地端点（CosyVoice/GPT-SoVITS）。 | 使用默认 Edge-TTS 及本地模拟/OpenAI 兼容语音端点，分别验证生成和句子对齐。 |
 | TASK-06 | protocol, packages/storage | OPEN | 2026-10-19 | 提案 2 中的存储引擎与紧凑 .sgtl 时间轴。 | 二进制序列化往返验证、相对 JSON 超过 95% 的压缩率及 O(1) 章节定位基准测试。 |
 | TASK-07 | 仓库整理 | IMPLEMENTED; LOCAL VERIFICATION | 2026-10-20 | CLEAN-01 存储/错误修复、可移植路径、分句/生命周期整合、本地检查和文档。 | [契约与证据](maintenance_CN.md)。正式合格性认定仍属于 GAP-04。 |
+| TASK-08 | protocol, apps/windows/native | 已实现；本地验证通过 | 2026-10-21 | .saga 资产包格式、清单引擎与单文件归档存储。 | 确定性 ZIP 容器构建/读取、SGMF 二进制清单往返序列化、O(1) 章节寻址、<= 256 KB 正文切片流式解压，以及纯单文件 .saga 本地持久化（无子文件夹解压）。 |
 
 ## 缺口与剩余验证
 

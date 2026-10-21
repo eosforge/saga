@@ -33,16 +33,81 @@ apps/windows/native/icons/source.png is the shared master for PNG/ICO/ICNS and b
 
 ## Data flow and limits
 
-1. The native picker returns a TXT path. Import reads bytes, computes BLAKE3 identity, caches the original file, decodes text, and selects chapter boundaries.
-2. SQLite stores book metadata, ordered section indices and chunk offsets, and retained review fingerprints. Chapter text is packed into 256 KB atomic chunk files under books/<book-id>/. Reimport replaces metadata and chunks in one transaction. Review saves commit sections and decisions together.
+1. The native picker returns a TXT path. Import reads bytes, computes BLAKE3 identity, decodes text, and selects chapter boundaries.
+2. SQLite stores book metadata, ordered section indices and chunk offsets, and retained review fingerprints. All chapter text and Deflate-compressed chunks (strictly <= 256 KB) are bundled directly inside a single, self-contained `.saga` archive container at `books/<book-id>.saga`. No book subdirectories are created on disk. Reimport replaces metadata and the `.saga` archive in one atomic transaction. Review saves commit sections and decisions together.
 3. The shelf loads summaries first and sections on selection. Repeated requests share a pending load. Catalog object identity prevents a late response from overwriting reimport or reviving a deleted book.
 4. Reading derives sentence chunks when persisted chunks are absent. Browser preview keeps the entire TXT as one transient in-memory section without native parsing.
 
-Debug data is under data/ in the compiled checkout. Packaged builds use the OS application-local data directory. The layout is storage/saga.db, cache/<book-id>.txt, and books/<book-id>/<chunk-index>.chunk. Moving a checkout requires rebuilding the debug binary; an existing binary retains its compile-time source location.
+Debug data is under data/ in the compiled checkout. Packaged builds use the OS application-local data directory. The layout is `storage/saga.db` and single archive packages `books/<book-id>.saga`. Moving a checkout requires rebuilding the debug binary; an existing binary retains its compile-time source location.
 
-SQLite and the raw cache are separate resources. Import/delete are not distributed transactions, and power-loss durability remains unqualified. [Maintenance](maintenance.md) defines failure guarantees and local-only evidence references. This cleanup did not move or reparse existing development data.
+SQLite and `.saga` archives are managed together. Import/delete transactions ensure metadata and archive consistency, and power-loss durability remains unqualified. [Maintenance](maintenance.md) defines failure guarantees and local-only evidence references. This cleanup did not move or reparse existing development data.
 
-TTS, real audio playback, .saga/EPUB import, timeline alignment, synchronization, full CAS, other platforms, and release packaging remain open in [tasks.md](tasks.md).
+TTS, real audio playback, EPUB import, timeline alignment, synchronization, full CAS, other platforms, and release packaging remain open in [tasks.md](tasks.md).
+
+## The .saga Asset Package Specification
+
+The canonical `.saga` container is a standardized, deterministic ZIP archive (RFC 1951) functioning as an immutable, self-contained digital publication. It organizes content into five orthogonal architectural pillars:
+
+```text
+my_novel.saga (Standard Deterministic ZIP Container)
+├── mimetype          # Identity: uncompressed (STORE) format signature
+├── manifest.bin      # Dispatch: binary metadata + section TOC + audio routing
+├── texts/            # Payload: multi-chapter Deflate slices strictly <= 256 KB
+│   ├── 0.chunk
+│   └── ...
+├── timeline.bin      # Timeline: lazy-loaded sentence millisecond alignment spans
+├── audio/            # Streams: uncompressed (STORE) AAC/Opus audio tracks
+└── cover.jpg         # Media: isolated cover image for shelf hydration
+```
+
+### 1. Architectural Pillars and Loading Lifecycle
+
+| Pillar | File Path | Compression | Lifecycle & Performance Contract |
+| :--- | :--- | :--- | :--- |
+| **Identity** | `mimetype` | STORE (0%) | Fixed 24 bytes (`application/x-saga-book`) at byte offset 30. Sniffed by external file managers without unzipping. The Saga reader runtime ignores it at startup (zero I/O). |
+| **Dispatch** | `manifest.bin` | STORE (0%) | 20–30 KB fixed-size binary TOC and UTF-8 string pool. Loaded strictly once on book open (1 I/O). Provides instant metadata, catalog tree, chunk routing, and chapter audio availability. |
+| **Payload** | `texts/*.chunk` | DEFLATE | Multi-chapter text blocks strictly bounded by 256 KB. Loaded on-demand: opening a book decompresses only the active reading chunk (1 I/O). Paragraphs are bounded by `\n\n`; sentences are deterministically split in memory on demand (zero index bloat). |
+| **Timeline** | `timeline.bin` | DEFLATE | Sentence-level millisecond alignment spans. Never read during plain text reading. Loaded lazily per chapter (approx. 300 bytes per chapter) only when audio narration is active. |
+| **Streams** | `audio/*.m4a` | STORE (0%) | Contiguous physical audio stream bytes. OS hardware decoders (MediaEngine, AVPlayer) stream directly via file descriptor offsets without intermediate extraction. |
+| **Media** | `cover.jpg` | STORE / Native | Isolated cover graphic. Read independently by bookshelf views without parsing chapter indices, and omitted during text reading. |
+
+### 2. Binary Manifest Layout (`manifest.bin`)
+
+`manifest.bin` supersedes database-backed chapter tables for publication storage. It uses an arithmetic $O(1)$ addressable entry table:
+
+1. **Header (64 bytes)**:
+   - `magic`: 4 bytes (`SGMF`).
+   - `version`: `u16` format revision.
+   - `flags`: `u16` publication feature flags.
+   - `sections_count`: `u32` total structural chapters.
+   - `chunks_count`: `u32` total text slice files under `texts/`.
+   - `total_chars`: `u32` total character count across the publication.
+   - `title_ptr`: `[offset: u32, len: u16]` pointing into the string pool.
+   - `author_ptr`: `[offset: u32, len: u16]` pointing into the string pool.
+   - `desc_ptr`: `[offset: u32, len: u16]` pointing into the string pool.
+   - `toc_offset`: `u64` byte offset where the fixed-size TOC array begins.
+   - `string_pool_offset`: `u64` byte offset where UTF-8 text attributes begin.
+   - `reserved`: 20 bytes reserved for schema evolution.
+2. **Section TOC Entries (32 bytes per section, 8-byte aligned)**:
+   - `chunk_index`: `u16` referencing `texts/{chunk_index}.chunk`.
+   - `flags`: `u16` flags (bit 0 indicates audio availability).
+   - `chunk_offset`: `u32` uncompressed byte start within the decompressed chunk.
+   - `byte_length`: `u32` uncompressed chapter text byte length.
+   - `char_count`: `u32` character count for progress computation.
+   - `volume_id`: `u16` volume ordinal.
+   - `title_offset`: `u32` relative title offset in the string pool.
+   - `title_length`: `u16` title UTF-8 byte length.
+   - `audio_duration_ms`: `u32` total chapter audio length in milliseconds.
+   - `timeline_offset`: `u32` byte offset in `timeline.bin` for sentence spans.
+3. **String Pool**:
+   - Contiguous packed UTF-8 byte sequence holding book title, author, description, and chapter titles.
+
+### 3. Separation of Publication Asset and User State
+
+- **Publication Asset (`.saga`)**: Immutable, content-addressed (BLAKE3), and crash-resilient. Shareable across devices with zero side effects.
+- **User State (`saga.db`)**: Local client SQLite database storing mutable user data:
+  - Reading progress anchor: `{ chapter_index: u32, paragraph_index: u16, sentence_index: u16, char_offset: u16, scroll_ratio: f16 }` (12 bytes).
+  - User highlights, bookmarks, notes, and local shelf metadata.
 
 ## Target design — not implemented as a complete system
 

@@ -20,7 +20,7 @@ function fixture({ saved, accepted = false } = {}) {
     saveAuditedSections: saved || (async () => ({})), selectBook: identity => selected.push(identity),
   };
   const script = readFileSync(join(__dirname, '../src/views/Audit.vue'), 'utf8').match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1];
-  const exposed = 'sections, anomalies, resolvedMap, filteredAnomalies, filterType, renderedSections, readerPaperRef, activePopoverSection, editTitle, failure, isSaving, openPopoverForSection, retain, restore, handleUndo, handleApplyRename, handleDeleteSection, selectAnomaly, saveAndOpenReader, skipAndOpenReader, isAnomalySection';
+  const exposed = 'sections, anomalies, resolvedMap, filteredAnomalies, filterType, renderedSections, readerPaperRef, activePopoverSection, editTitle, failure, isSaving, openPopoverForSection, retain, restore, handleUndo, handleApplyRename, handleDeleteSection, handleDemoteToPrev, handleDemoteNext, mergeIncludeTitle, selectAnomaly, saveAndOpenReader, skipAndOpenReader, isAnomalySection';
   const code = ts.transpileModule(`${script}\nexport { ${exposed} };`, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
@@ -158,4 +158,27 @@ test('saving or skipping opens the audited book even when another book was activ
     assert.deepEqual(ui.selected, ['book']);
     assert.deepEqual(ui.events, ['open-reader']);
   }
+});
+
+
+test('demoting chapter into previous supports discarding or including title', async () => {
+  const ui1 = fixture();
+  await vue.nextTick();
+  ui1.openPopoverForSection(ui1.sections.value[8]);
+  assert.equal(ui1.mergeIncludeTitle.value, false);
+  ui1.handleDemoteToPrev();
+  assert.equal(ui1.sections.value.length, 11);
+  assert.equal(ui1.sections.value[7].title, '第8章 同名标题');
+  assert.ok(ui1.sections.value[7].body.includes(ui1.original[8].body));
+  assert.ok(!ui1.sections.value[7].body.includes('第8章 同名标题'));
+  assert.equal(ui1.filteredAnomalies.value.length, 0);
+
+  const ui2 = fixture();
+  await vue.nextTick();
+  ui2.openPopoverForSection(ui2.sections.value[8]);
+  ui2.mergeIncludeTitle.value = true;
+  ui2.handleDemoteToPrev();
+  assert.equal(ui2.sections.value.length, 11);
+  assert.ok(ui2.sections.value[7].body.includes('第8章 同名标题'));
+  assert.ok(ui2.sections.value[7].body.includes(ui2.original[8].body));
 });

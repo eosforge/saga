@@ -2,6 +2,7 @@
 /** Display actual storage location and explicitly unavailable preferences. */
 import { ref, onMounted } from "vue";
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { showHeroBanner } from "../stores/library";
 
 // Resolve storage from the host instead of embedding a developer's filesystem.
 const storagePath = ref(isTauri() ? "正在读取…" : "浏览器内存（刷新后清空）");
@@ -31,7 +32,7 @@ onMounted(async () => {
             <div class="path-display-box"><span class="path-text">{{ storagePath }}</span></div>
             <div class="sub-paths">
               <span>storage/saga.db：书籍、章节与核验决定</span>
-              <span>cache/：导入原始文件缓存</span>
+              <span>books/&lt;id&gt;.saga：单文件归档存储正文与分块数据</span>
             </div>
           </div>
           <div class="actions-col">
@@ -52,8 +53,20 @@ onMounted(async () => {
       </div>
     </section>
     <section class="config-section">
-      <h2 class="section-title">🎨 外观</h2>
+      <h2 class="section-title">🎨 外观与书架</h2>
       <div class="config-card">
+        <div class="config-row">
+          <div class="config-meta">
+            <span class="config-name">横幅显示当前阅读</span>
+            <span class="config-desc">在书架顶部以巨幅焦点卡片展示正在阅读的书籍。关闭后书架将以全平铺封面流呈现。</span>
+          </div>
+          <div class="toggle-col">
+            <label class="switch">
+              <input type="checkbox" v-model="showHeroBanner" />
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
         <div class="config-row">
           <div class="config-meta">
             <span class="config-name">当前使用深色主题</span>
@@ -256,5 +269,55 @@ onMounted(async () => {
   height: 18px;
   accent-color: #3b82f6;
   cursor: pointer;
+}
+
+.toggle-col {
+  display: flex;
+  align-items: center;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #334155;
+  transition: 0.2s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #f8fafc;
+  transition: 0.2s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #38bdf8;
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
 }
 </style>

@@ -3,16 +3,16 @@
 use std::io::{self, Read};
 use std::path::Path;
 
-/// Rejects unsupported formats before interpreting binary content as TXT.
+/// Rejects unsupported formats before interpreting binary content as TXT or .saga.
 pub(super) fn validate(path: &Path) -> Result<(), String> {
     if path
         .extension()
         .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("txt"))
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("txt") || extension.eq_ignore_ascii_case("saga"))
     {
         Ok(())
     } else {
-        Err("目前仅支持 TXT 文件；EPUB 解析尚未实现".into())
+        Err("目前仅支持 TXT 与 .saga 归档文件".into())
     }
 }
 
@@ -71,6 +71,8 @@ mod tests {
     #[test]
     fn rejects_unsupported_formats_without_reading_the_source() {
         assert!(validate(Path::new("book.TXT")).is_ok());
+        assert!(validate(Path::new("book.saga")).is_ok());
+        assert!(validate(Path::new("book.SAGA")).is_ok());
         assert!(validate(Path::new("book.epub")).is_err());
         assert!(validate(Path::new("book")).is_err());
     }

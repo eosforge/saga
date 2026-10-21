@@ -3,7 +3,6 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import {
   activeBook,
-  activeParagraphs,
   activeSentenceIndex,
   isPlaying,
   hasAudio,
@@ -65,6 +64,12 @@ function initRenderedChapters(): void {
   const curIdx = activeBook.value.currentChapterIndex ?? 0;
   const initialSec = activeBook.value.sections[curIdx] || activeBook.value.sections[0];
   renderedChapters.value = [initialSec];
+  nextTick(() => {
+    const activeTocRow = document.querySelector<HTMLElement>(".chapter-row.active");
+    if (activeTocRow) {
+      activeTocRow.scrollIntoView({ block: "nearest" });
+    }
+  });
 }
 
 watch(
@@ -80,10 +85,6 @@ watch(
     }
   }
 );
-
-function selectSentence(index: number): void {
-  activeSentenceIndex.value = index;
-}
 
 function selectChapterSentence(sec: Section, chunkIndex: number): void {
   if (activeBook.value && activeBook.value.currentChapterIndex !== sec.index) {
@@ -108,26 +109,16 @@ async function onSelectChapter(index: number): Promise<void> {
   isJumping.value = true;
   await setBookChapter(activeBook.value.id, index);
 
-  // Pre-load surrounding window so upward and downward continuous scrolling works instantly
-  const windowToRender: Section[] = [];
-  if (index > 0 && sections[index - 1]) {
-    windowToRender.push(sections[index - 1]);
-  }
-  windowToRender.push(sections[index]);
-  if (index + 1 < sections.length && sections[index + 1]) {
-    windowToRender.push(sections[index + 1]);
-  }
-
-  renderedChapters.value = windowToRender;
+  // Directly render the target chapter at scrollTop = 0 to guarantee exact chapter display
+  renderedChapters.value = [sections[index]];
   nextTick(() => {
     const el = readerViewportRef.value;
     if (el) {
-      const targetBlock = el.querySelector<HTMLElement>(`[data-chapter-index="${index}"]`);
-      if (targetBlock) {
-        targetBlock.scrollIntoView({ behavior: "instant", block: "start" });
-      } else {
-        el.scrollTop = 0;
-      }
+      el.scrollTop = 0;
+    }
+    const activeTocRow = document.querySelector<HTMLElement>(".chapter-row.active");
+    if (activeTocRow) {
+      activeTocRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
     setTimeout(() => {
       isJumping.value = false;
@@ -447,16 +438,6 @@ onUnmounted(() => {
             class="chapter-article-block"
             :data-chapter-index="chapter.index"
           >
-            <!-- Chapter Stitch Divider (between continuous chapters) -->
-            <div v-if="cIdx > 0" class="chapter-stitch-divider">
-              <div class="stitch-line"></div>
-              <div class="stitch-badge">
-                <span class="stitch-icon">✦</span>
-                <span class="stitch-title">{{ chapter.title }}</span>
-              </div>
-              <div class="stitch-line"></div>
-            </div>
-
             <h2 class="article-chapter-title" :class="{ 'stitched-title': cIdx > 0 }">
               {{ chapter.title }}
             </h2>
@@ -480,27 +461,6 @@ onUnmounted(() => {
             </div>
           </article>
 
-          <!-- Fallback when renderedChapters is empty -->
-          <article v-if="renderedChapters.length === 0" class="chapter-article-block">
-            <h2 class="article-chapter-title">{{ activeBook.currentChapter }}</h2>
-            <div class="article-body" :style="{ fontSize: `${fontSize}px` }">
-              <p
-                v-for="para in activeParagraphs"
-                :key="para.pIndex"
-                class="reader-para"
-              >
-                <span
-                  v-for="chunk in para.chunks"
-                  :key="chunk.id"
-                  class="saga-chunk"
-                  :class="{ active: activeSentenceIndex === chunk.index }"
-                  @click="selectSentence(chunk.index)"
-                >
-                  {{ chunk.text }}
-                </span>
-              </p>
-            </div>
-          </article>
 
           <!-- Book Completion Indicator -->
           <div v-if="isBookFinished" class="book-finished-indicator">
@@ -991,54 +951,15 @@ onUnmounted(() => {
   box-shadow: 0 0 14px rgba(245, 158, 11, 0.5);
 }
 
-/* Chapter Continuous Stitching Divider */
+/* Chapter Continuous Stitching */
 .chapter-article-block {
-  margin-bottom: 24px;
-}
-
-.chapter-stitch-divider {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin: 64px 0 36px 0;
-  user-select: none;
-}
-
-.stitch-line {
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, #475569, transparent);
-}
-
-.stitch-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 20px;
-  padding: 6px 18px;
-  color: #38bdf8;
-  font-size: 13px;
-  font-weight: 600;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-}
-
-.stitch-icon {
-  font-size: 12px;
-  color: #f59e0b;
-}
-
-.stitch-title {
-  max-width: 320px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-bottom: 36px;
 }
 
 .stitched-title {
-  font-size: 20px;
-  color: #cbd5e1;
+  font-size: 24px;
+  color: #f8fafc;
+  margin-top: 64px;
   margin-bottom: 24px;
   padding-bottom: 12px;
 }

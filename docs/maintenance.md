@@ -21,7 +21,7 @@ Public parser signatures, IPC command names, serialized fields, and retain seman
 
 ## Storage and lifecycle limits
 
-SQLite stores the readable text. Original TXT bytes are cached separately at cache/<book-id>.txt. Failed import may leave an unreferenced cache. If cache deletion succeeds but database commit fails, the readable book may remain without its optional raw cache. Cross-resource crash atomicity is not guaranteed.
+SQLite stores section indexing metadata, while chapter text and Deflate-compressed chunks are packaged in self-contained `.saga` archive files under `books/<book-id>.saga`. Staged writes ensure that failed imports or updates leave existing books untouched. Cross-resource crash atomicity is not guaranteed.
 
 SQLite uses WAL and synchronous=NORMAL. Process failure and power-loss durability are distinct; power-loss durability remains unqualified. Existing additive description/review schema setup is preserved. Tests use in-memory or uniquely named temporary databases, not the running application's database.
 
