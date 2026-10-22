@@ -1,0 +1,229 @@
+[
+  {
+    "id": "runner",
+    "program": "node",
+    "cwd": ".",
+    "args": [
+      "--test",
+      "tools/check.test.cjs"
+    ],
+    "timeoutMs": 30000,
+    "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\6732_1792664527976\\node.exe",
+    "arguments": [
+      "--test",
+      "tools/check.test.cjs"
+    ],
+    "started": "2026-10-22T10:22:08.359Z",
+    "finished": "2026-10-22T10:22:09.368Z",
+    "exitCode": 0,
+    "signal": null,
+    "termination": "exited",
+    "error": null,
+    "bytes": 306,
+    "passed": true,
+    "log": "runner.log",
+    "sha256": "17b8554ac1105b2f9214eca93404ea1d2b24a0d2dd493b491b97e21bd0fa9ff6"
+  },
+  {
+    "id": "format",
+    "program": "cargo",
+    "cwd": ".",
+    "args": [
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "timeoutMs": 30000,
+    "command": "rustup",
+    "arguments": [
+      "run",
+      "1.98.0",
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "started": "2026-10-22T10:22:09.370Z",
+    "finished": "2026-10-22T10:22:09.689Z",
+    "exitCode": 0,
+    "signal": null,
+    "termination": "exited",
+    "error": null,
+    "bytes": 0,
+    "passed": true,
+    "log": "format.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "id": "clippy",
+    "program": "cargo",
+    "cwd": ".",
+    "args": [
+      "clippy",
+      "--offline",
+      "--locked",
+      "--workspace",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "timeoutMs": 180000,
+    "command": "rustup",
+    "arguments": [
+      "run",
+      "1.98.0",
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "--workspace",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "started": "2026-10-22T10:22:09.690Z",
+    "finished": "2026-10-22T10:22:10.810Z",
+    "exitCode": 0,
+    "signal": null,
+    "termination": "exited",
+    "error": null,
+    "bytes": 72,
+    "passed": true,
+    "log": "clippy.log",
+    "sha256": "64a846600e0673c431c1725d21a1f68727127717448e7bd2a5deb9d3b55005c3"
+  },
+  {
+    "id": "rust",
+    "program": "cargo",
+    "cwd": ".",
+    "args": [
+      "test",
+      "--offline",
+      "--locked",
+      "--workspace"
+    ],
+    "timeoutMs": 180000,
+    "command": "rustup",
+    "arguments": [
+      "run",
+      "1.98.0",
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--workspace"
+    ],
+    "started": "2026-10-22T10:22:10.811Z",
+    "finished": "2026-10-22T10:22:12.648Z",
+    "exitCode": 0,
+    "signal": null,
+    "termination": "exited",
+    "error": null,
+    "bytes": 5433,
+    "passed": true,
+    "log": "rust.log",
+    "sha256": "c4179acda1869f77ae3f86f24b69ee2513f228bf0df4defa779ea5d80048dd32"
+  },
+  {
+    "id": "style",
+    "program": "node",
+    "cwd": "apps/windows",
+    "args": [
+      "tools/style.cjs"
+    ],
+    "timeoutMs": 30000,
+    "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\6732_1792664527976\\node.exe",
+    "arguments": [
+      "tools/style.cjs"
+    ],
+    "started": "2026-10-22T10:22:12.649Z",
+    "finished": "2026-10-22T10:22:13.167Z",
+    "exitCode": 0,
+    "signal": null,
+    "termination": "exited",
+    "error": null,
+    "bytes": 68,
+    "passed": true,
+    "log": "style.log",
+    "sha256": "9466bfa9eea9e22ae1757ad3e32b93e7f60ac571f58c666585a93e060184489b"
+  },
+  {
+    "id": "frontend",
+    "program": "node",
+    "cwd": "apps/windows",
+    "args": [
+      "--test",
+      "tests/*.cjs"
+    ],
+    "timeoutMs": 30000,
+    "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\6732_1792664527976\\node.exe",
+    "arguments": [
+      "--test",
+      "tests/*.cjs"
+    ],
+    "started": "2026-10-22T10:22:13.168Z",
+    "finished": "2026-10-22T10:22:14.407Z",
+    "exitCode": 0,
+    "signal": null,
+    "termination": "exited",
+    "error": null,
+    "bytes": 3009,
+    "passed": true,
+    "log": "frontend.log",
+    "sha256": "34e0b1d8394312293dfbe5f7564def7eb3bfd584c123e22fccc7da7511dcf9d1"
+  },
+  {
+    "id": "types",
+    "program": "node",
+    "cwd": "apps/windows",
+    "args": [
+      "node_modules/vue-tsc/bin/vue-tsc.js",
+      "--noEmit"
+    ],
+    "timeoutMs": 30000,
+    "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\6732_1792664527976\\node.exe",
+    "arguments": [
+      "node_modules/vue-tsc/bin/vue-tsc.js",
+      "--noEmit"
+    ],
+    "started": "2026-10-22T10:22:14.407Z",
+    "finished": "2026-10-22T10:22:16.506Z",
+    "exitCode": 0,
+    "signal": null,
+    "termination": "exited",
+    "error": null,
+    "bytes": 0,
+    "passed": true,
+    "log": "types.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "id": "build",
+    "program": "node",
+    "cwd": "apps/windows",
+    "args": [
+      "node_modules/vite/bin/vite.js",
+      "build"
+    ],
+    "timeoutMs": 30000,
+    "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\6732_1792664527976\\node.exe",
+    "arguments": [
+      "node_modules/vite/bin/vite.js",
+      "build"
+    ],
+    "started": "2026-10-22T10:22:16.507Z",
+    "finished": "2026-10-22T10:22:18.512Z",
+    "exitCode": 0,
+    "signal": null,
+    "termination": "exited",
+    "error": null,
+    "bytes": 746,
+    "passed": true,
+    "log": "build.log",
+    "sha256": "e602024675ee21092057d35bc4b389e1e0a9043b77c4d892ebe0a577ee59f0fd"
+  }
+]

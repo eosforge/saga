@@ -21,6 +21,8 @@ The linked documents own current facts. Earlier results describe their original 
 | 2026-10-21 | SPEC-01: defined .saga standard ZIP container specification with binary manifest, 256 KB text slices, and lazy audio timeline. | [Architecture](architecture.md), [tasks](tasks.md) |
 | 2026-10-21 | PKG-01: integrated .saga ZIP container format, native import/export engine, fixed reader chapter desync, and enabled seamless drag-and-drop ingestion. | [Architecture](architecture.md), [tasks](tasks.md) |
 | 2026-10-21 | PKG-02: pure single-file .saga on-disk storage architecture without directory unpacking, in-memory chunk packaging, and elimination of legacy compatibility fallbacks. | [Architecture](architecture.md), [receipt](evidence/2026-10-21T09-40-46-764Z-64234f34/receipt.json) |
+| 2026-10-22 | PERF-01: headroom-based zero-clone chunk compression, O(1) audit finding index, full-screen interaction blocking overlay during persistence, determinate 0-100% progress for import and audit saving, complete post-audit lifecycle teardown, and direct back-to-shelf navigation from reader. | [Architecture](architecture.md), [application](../apps/windows/src/App.vue) |
+| 2026-10-22 | STORE-03: eliminated SQLite sections table, shifted chapter TOC directly to .saga manifest.bin with zero-copy volume lookup, reduced saga.db from 1,444 KB to ~8 KB, and implemented startup background pre-warming for instant reader launch. | [Architecture](architecture.md), [receipt](evidence/2026-10-22T10-22-08-229Z-6df95b30/receipt.json) |
 
 ## Historical archive
 

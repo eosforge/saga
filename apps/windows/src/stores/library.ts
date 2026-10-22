@@ -39,6 +39,7 @@ export const speechRate = ref(1.0);
 export const failure = ref("");
 export const activeAuditReport = ref<NovelValidation | null>(null);
 export const activeAuditNovel = ref<Novel | null>(null);
+export const isGlobalBusy = ref(false);
 
 const STORED_BANNER_KEY = "saga_shelf_show_hero_banner";
 export const showHeroBanner = ref<boolean>(
@@ -256,6 +257,11 @@ export async function loadStoredNovels(): Promise<void> {
     }
     if (!activeBookId.value) activeBookId.value = books.value[0]?.id || "";
     failure.value = "";
+
+    const recent = books.value[0];
+    if (recent && recent.sections === undefined) {
+      setTimeout(() => { void ensureBookLoaded(recent.id).catch(() => { }); }, 50);
+    }
   } catch (error) {
     failure.value = "读取书架失败：" + error;
     throw error;

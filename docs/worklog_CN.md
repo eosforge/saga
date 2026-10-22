@@ -21,6 +21,8 @@
 | 2026-10-21 | SPEC-01：定义 .saga 标准 ZIP 容器规范，包含二进制清单、256 KB 正文切片及懒加载伴读时间轴。 | [架构](architecture_CN.md)、[任务台账](tasks_CN.md) |
 | 2026-10-21 | PKG-01：接入 .saga ZIP 容器格式、原生导入导出引擎、修复阅读视口章节错位并支持无缝拖拽导入。 | [架构](architecture_CN.md)、[任务台账](tasks_CN.md) |
 | 2026-10-21 | PKG-02：纯单文件 .saga 磁盘存储架构（无目录解压）、全内存切片打包入库，并彻底清除历史兼容回退代码。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-21T09-40-46-764Z-64234f34/receipt.json) |
+| 2026-10-22 | PERF-01：基于余量阈值的零拷贝分块压缩算法、O(1) 审校索引、持久化全屏阻断遮罩、导入与审校保存确定性 0-100% 进度显示、审校后视图彻底销毁及阅读器后退直达书架。 | [架构](architecture_CN.md)、[前端应用](../apps/windows/src/App.vue) |
+| 2026-10-22 | STORE-03：移除 SQLite sections 章节数据表，章节目录直接由 .saga manifest.bin 与零拷贝分卷索引承载，saga.db 大小由 1,444 KB 缩减至 ~8 KB，并新增启动后台预热实现 0ms 秒开阅读。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-22T10-22-08-229Z-6df95b30/receipt.json) |
 
 ## 历史归档
 

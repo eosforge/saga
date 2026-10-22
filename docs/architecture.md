@@ -34,8 +34,8 @@ apps/windows/native/icons/source.png is the shared master for PNG/ICO/ICNS and b
 ## Data flow and limits
 
 1. The native picker returns a TXT path. Import reads bytes, computes BLAKE3 identity, decodes text, and selects chapter boundaries.
-2. SQLite stores book metadata, ordered section indices and chunk offsets, and retained review fingerprints. All chapter text and Deflate-compressed chunks (strictly <= 256 KB) are bundled directly inside a single, self-contained `.saga` archive container at `books/<book-id>.saga`. No book subdirectories are created on disk. Reimport replaces metadata and the `.saga` archive in one atomic transaction. Review saves commit sections and decisions together.
-3. The shelf loads summaries first and sections on selection. Repeated requests share a pending load. Catalog object identity prevents a late response from overwriting reimport or reviving a deleted book.
+2. SQLite stores book metadata, first chapter heading, and retained review fingerprints. All chapter indexing and TOC metadata are encoded directly in the $O(1)$ binary manifest (`manifest.bin`) alongside Deflate-compressed text slices (strictly <= 256 KB) inside a single, self-contained `.saga` archive container at `books/<book-id>.saga`. Redundant `sections` tables are eliminated from SQLite. Reimport replaces metadata and the `.saga` archive in one atomic transaction. Review saves commit decisions and replaces the `.saga` archive atomically.
+3. The shelf loads lightweight summaries directly from the minimal SQLite `books` table without touching archive files. On startup, the most recently read book is pre-warmed in the background for instant 0ms reader opening. Selecting a book hydrates chapter sections on demand directly from `manifest.bin` and compressed chunk files. Repeated requests share a pending load. Catalog object identity prevents a late response from overwriting reimport or reviving a deleted book.
 4. Reading derives sentence chunks when persisted chunks are absent. Browser preview keeps the entire TXT as one transient in-memory section without native parsing.
 
 Debug data is under data/ in the compiled checkout. Packaged builds use the OS application-local data directory. The layout is `storage/saga.db` and single archive packages `books/<book-id>.saga`. Moving a checkout requires rebuilding the debug binary; an existing binary retains its compile-time source location.
@@ -82,25 +82,30 @@ my_novel.saga (Standard Deterministic ZIP Container)
    - `sections_count`: `u32` total structural chapters.
    - `chunks_count`: `u32` total text slice files under `texts/`.
    - `total_chars`: `u32` total character count across the publication.
+   - `volumes_offset`: `u32` byte offset to the volume offset table.
    - `title_ptr`: `[offset: u32, len: u16]` pointing into the string pool.
    - `author_ptr`: `[offset: u32, len: u16]` pointing into the string pool.
    - `desc_ptr`: `[offset: u32, len: u16]` pointing into the string pool.
-   - `toc_offset`: `u64` byte offset where the fixed-size TOC array begins.
-   - `string_pool_offset`: `u64` byte offset where UTF-8 text attributes begin.
-   - `reserved`: 20 bytes reserved for schema evolution.
-2. **Section TOC Entries (32 bytes per section, 8-byte aligned)**:
+   - `toc_offset`: `u32` byte offset where the fixed-size TOC array begins.
+   - `volume_count`: `u16` total volumes.
+   - `string_pool_offset`: `u32` byte offset where UTF-8 text attributes begin.
+   - `reserved`: 12 bytes reserved for schema evolution.
+2. **Volume Table (6 bytes per volume, $O(1)$ lookup)**:
+   - `offset`: `u32` byte offset into string pool.
+   - `length`: `u16` UTF-8 byte length of volume title.
+3. **Section TOC Entries (32 bytes per section, 8-byte aligned)**:
    - `chunk_index`: `u16` referencing `texts/{chunk_index}.chunk`.
    - `flags`: `u16` flags (bit 0 indicates audio availability).
    - `chunk_offset`: `u32` uncompressed byte start within the decompressed chunk.
    - `byte_length`: `u32` uncompressed chapter text byte length.
    - `char_count`: `u32` character count for progress computation.
-   - `volume_id`: `u16` volume ordinal.
+   - `volume_id`: `u16` volume ordinal index into Volume Table.
    - `title_offset`: `u32` relative title offset in the string pool.
    - `title_length`: `u16` title UTF-8 byte length.
    - `audio_duration_ms`: `u32` total chapter audio length in milliseconds.
    - `timeline_offset`: `u32` byte offset in `timeline.bin` for sentence spans.
-3. **String Pool**:
-   - Contiguous packed UTF-8 byte sequence holding book title, author, description, and chapter titles.
+4. **String Pool**:
+   - Contiguous packed UTF-8 byte sequence holding book title, author, description, volume titles, and chapter titles.
 
 ### 3. Separation of Publication Asset and User State
 

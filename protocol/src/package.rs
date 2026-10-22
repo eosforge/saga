@@ -28,6 +28,7 @@ pub struct PackageManifest {
     pub description: String,
     pub total_chars: u32,
     pub chunks_count: u32,
+    pub volumes: Vec<String>,
     pub sections: Vec<PackageSection>,
 }
 
@@ -66,11 +67,23 @@ impl PackageManifest {
         let desc_len = desc_bytes.len() as u16;
         string_pool.extend_from_slice(desc_bytes);
 
+        let volume_count = self.volumes.len() as u16;
+        let mut volume_ptrs = Vec::with_capacity(self.volumes.len());
+        for v in &self.volumes {
+            let v_bytes = v.as_bytes();
+            let v_offset = string_pool.len() as u32;
+            let v_len = v_bytes.len() as u16;
+            string_pool.extend_from_slice(v_bytes);
+            volume_ptrs.push((v_offset, v_len));
+        }
+
         // 2. Prepare TOC entries and append section titles to string pool
         let sections_count = self.sections.len() as u32;
         let toc_offset = HEADER_SIZE as u64;
         let toc_size = self.sections.len() * TOC_ENTRY_SIZE;
-        let string_pool_offset = toc_offset + toc_size as u64;
+        let volumes_offset = (toc_offset + toc_size as u64) as u32;
+        let volume_table_size = self.volumes.len() * 6;
+        let string_pool_offset = (volumes_offset as u64) + (volume_table_size as u64);
 
         let mut toc_bytes = Vec::with_capacity(toc_size);
         for sec in &self.sections {
@@ -97,20 +110,26 @@ impl PackageManifest {
             toc_bytes.extend_from_slice(&sec.timeline_offset.to_le_bytes()); // 28..32
         }
 
+        let mut volume_bytes = Vec::with_capacity(volume_table_size);
+        for (offset, len) in volume_ptrs {
+            volume_bytes.extend_from_slice(&offset.to_le_bytes());
+            volume_bytes.extend_from_slice(&len.to_le_bytes());
+        }
+
         // 3. Assemble Header (64 bytes)
-        let mut buffer = Vec::with_capacity(HEADER_SIZE + toc_size + string_pool.len());
+        let mut buffer = Vec::with_capacity(HEADER_SIZE + toc_size + volume_table_size + string_pool.len());
         buffer.extend_from_slice(&MANIFEST_MAGIC); // 0..4
         buffer.extend_from_slice(&MANIFEST_VERSION.to_le_bytes()); // 4..6
         buffer.extend_from_slice(&0u16.to_le_bytes()); // 6..8: flags
         buffer.extend_from_slice(&sections_count.to_le_bytes()); // 8..12
         buffer.extend_from_slice(&self.chunks_count.to_le_bytes()); // 12..16
         buffer.extend_from_slice(&self.total_chars.to_le_bytes()); // 16..20
-        buffer.extend_from_slice(&0u32.to_le_bytes()); // 20..24: reserved
+        buffer.extend_from_slice(&volumes_offset.to_le_bytes()); // 20..24: volumes_offset
         buffer.extend_from_slice(&toc_offset.to_le_bytes()); // 24..32
         buffer.extend_from_slice(&string_pool_offset.to_le_bytes()); // 32..40
         buffer.extend_from_slice(&title_offset.to_le_bytes()); // 40..44
         buffer.extend_from_slice(&title_len.to_le_bytes()); // 44..46
-        buffer.extend_from_slice(&0u16.to_le_bytes()); // 46..48: volume_count/reserved
+        buffer.extend_from_slice(&volume_count.to_le_bytes()); // 46..48: volume_count
         buffer.extend_from_slice(&author_offset.to_le_bytes()); // 48..52
         buffer.extend_from_slice(&author_len.to_le_bytes()); // 52..54
         buffer.extend_from_slice(&0u16.to_le_bytes()); // 54..56: reserved
@@ -120,8 +139,9 @@ impl PackageManifest {
 
         debug_assert_eq!(buffer.len(), HEADER_SIZE);
 
-        // 4. Combine Header + TOC + String Pool
+        // 4. Combine Header + TOC + Volume Table + String Pool
         buffer.extend_from_slice(&toc_bytes);
+        buffer.extend_from_slice(&volume_bytes);
         buffer.extend_from_slice(&string_pool);
 
         buffer
@@ -130,6 +150,11 @@ impl PackageManifest {
     /// Deserializes a full package manifest from bytes.
     pub fn decode(bytes: &[u8]) -> Result<Self, ProtocolError> {
         let view = PackageManifestView::parse(bytes)?;
+
+        let mut volumes = Vec::with_capacity(view.volume_count() as usize);
+        for v in 0..view.volume_count() {
+            volumes.push(view.volume_at(v)?.to_string());
+        }
 
         let mut sections = Vec::with_capacity(view.sections_count() as usize);
         for i in 0..view.sections_count() {
@@ -142,6 +167,7 @@ impl PackageManifest {
             description: view.description()?.to_string(),
             total_chars: view.total_chars(),
             chunks_count: view.chunks_count(),
+            volumes,
             sections,
         })
     }
@@ -155,6 +181,8 @@ pub struct PackageManifestView<'a> {
     chunks_count: u32,
     total_chars: u32,
     toc_offset: usize,
+    volumes_offset: usize,
+    volume_count: u16,
     string_pool_offset: usize,
     title_offset: usize,
     title_len: usize,
@@ -185,11 +213,13 @@ impl<'a> PackageManifestView<'a> {
         let sections_count = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
         let chunks_count = u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]);
         let total_chars = u32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
+        let volumes_offset = u32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]) as usize;
         let toc_offset = u64::from_le_bytes([bytes[24], bytes[25], bytes[26], bytes[27], bytes[28], bytes[29], bytes[30], bytes[31]]) as usize;
         let string_pool_offset = u64::from_le_bytes([bytes[32], bytes[33], bytes[34], bytes[35], bytes[36], bytes[37], bytes[38], bytes[39]]) as usize;
 
         let title_offset = u32::from_le_bytes([bytes[40], bytes[41], bytes[42], bytes[43]]) as usize;
         let title_len = u16::from_le_bytes([bytes[44], bytes[45]]) as usize;
+        let volume_count = u16::from_le_bytes([bytes[46], bytes[47]]);
 
         let author_offset = u32::from_le_bytes([bytes[48], bytes[49], bytes[50], bytes[51]]) as usize;
         let author_len = u16::from_le_bytes([bytes[52], bytes[53]]) as usize;
@@ -211,6 +241,8 @@ impl<'a> PackageManifestView<'a> {
             chunks_count,
             total_chars,
             toc_offset,
+            volumes_offset,
+            volume_count,
             string_pool_offset,
             title_offset,
             title_len,
@@ -233,6 +265,10 @@ impl<'a> PackageManifestView<'a> {
         self.total_chars
     }
 
+    pub fn volume_count(&self) -> u16 {
+        self.volume_count
+    }
+
     pub fn title(&self) -> Result<&'a str, ProtocolError> {
         self.get_string(self.title_offset, self.title_len)
     }
@@ -243,6 +279,24 @@ impl<'a> PackageManifestView<'a> {
 
     pub fn description(&self) -> Result<&'a str, ProtocolError> {
         self.get_string(self.desc_offset, self.desc_len)
+    }
+
+    pub fn volume_at(&self, id: u16) -> Result<&'a str, ProtocolError> {
+        if id >= self.volume_count {
+            return Ok("");
+        }
+        let entry_start = self.volumes_offset + (id as usize * 6);
+        if entry_start + 6 > self.bytes.len() {
+            return Err(ProtocolError::Serialization("volume table entry out of bounds".into()));
+        }
+        let offset = u32::from_le_bytes([
+            self.bytes[entry_start],
+            self.bytes[entry_start + 1],
+            self.bytes[entry_start + 2],
+            self.bytes[entry_start + 3],
+        ]) as usize;
+        let len = u16::from_le_bytes([self.bytes[entry_start + 4], self.bytes[entry_start + 5]]) as usize;
+        self.get_string(offset, len)
     }
 
     /// O(1) arithmetic seek to a specific section entry.
@@ -306,6 +360,7 @@ mod tests {
             description: "诡秘之主第二部".to_string(),
             total_chars: 2_450_000,
             chunks_count: 8,
+            volumes: vec!["第一部 荒野".to_string(), "第二部 旅程".to_string()],
             sections: vec![
                 PackageSection {
                     title: "引子".to_string(),
@@ -351,6 +406,7 @@ mod tests {
         assert_eq!(decoded.title, manifest.title);
         assert_eq!(decoded.author, manifest.author);
         assert_eq!(decoded.description, manifest.description);
+        assert_eq!(decoded.volumes, manifest.volumes);
         assert_eq!(decoded.sections.len(), 3);
         assert_eq!(decoded.sections[1].title, "第一章 游民");
         assert_eq!(decoded.sections[1].audio_duration_ms, 540_000);
@@ -361,6 +417,9 @@ mod tests {
         let view = PackageManifestView::parse(&encoded).expect("parse view failed");
         assert_eq!(view.title().unwrap(), "宿命之环");
         assert_eq!(view.author().unwrap(), "爱潜水的乌贼");
+        assert_eq!(view.volume_count(), 2);
+        assert_eq!(view.volume_at(0).unwrap(), "第一部 荒野");
+        assert_eq!(view.volume_at(1).unwrap(), "第二部 旅程");
         assert_eq!(view.sections_count(), 3);
 
         let sec2 = view.section_at(2).expect("lookup section 2 failed");

@@ -38,40 +38,34 @@ pub(super) fn initialize(conn: &Connection) -> Result<(), String> {
              chapters INTEGER NOT NULL,
              format TEXT NOT NULL,
              description TEXT NOT NULL DEFAULT '',
+             first_chapter TEXT NOT NULL DEFAULT '正文',
              created_at INTEGER NOT NULL
          );
-         CREATE TABLE IF NOT EXISTS sections (
-             id TEXT PRIMARY KEY,
-             book_id TEXT NOT NULL,
-             section_index INTEGER NOT NULL,
-             title TEXT NOT NULL,
-             volume TEXT NOT NULL,
-             chunk_index INTEGER NOT NULL,
-             byte_offset INTEGER NOT NULL,
-             byte_length INTEGER NOT NULL,
-             chunks_json TEXT NOT NULL DEFAULT ''
-         );
-         CREATE INDEX IF NOT EXISTS idx_sections_book ON sections(book_id, section_index);
          CREATE TABLE IF NOT EXISTS reviews (
              book_id TEXT NOT NULL,
              fingerprint TEXT NOT NULL,
              PRIMARY KEY (book_id, fingerprint)
-         );",
+         );
+         DROP TABLE IF EXISTS sections;",
     )
     .map_err(|e| format!("failed to initialize database schema: {}", e))?;
+
+    let _ = conn.execute("ALTER TABLE books ADD COLUMN first_chapter TEXT NOT NULL DEFAULT '正文'", []);
+
+    let freelist: i64 = conn.query_row("PRAGMA freelist_count", [], |r| r.get(0)).unwrap_or(0);
+    if freelist > 0 {
+        let _ = conn.execute_batch("VACUUM;");
+    }
 
     Ok(())
 }
 
 struct SectionMeta<'a> {
-    id: &'a str,
-    index: u32,
     title: &'a str,
     volume: &'a str,
     chunk_index: u32,
     byte_offset: u32,
     byte_length: u32,
-    chunks_json: String,
 }
 
 /// Compresses raw byte buffer using Deflate algorithm.
@@ -114,20 +108,12 @@ fn flush_chunk<'a>(
     packed_chunks.push(PackedChunk { index: chunk_idx, compressed });
 
     for &(sec, byte_offset, byte_length) in chunk_sections {
-        let chunks_json = if sec.chunks.is_empty() {
-            String::new()
-        } else {
-            serde_json::to_string(&sec.chunks).map_err(|error| error.to_string())?
-        };
         metas.push(SectionMeta {
-            id: &sec.id,
-            index: sec.index,
             title: &sec.title,
             volume: &sec.volume,
             chunk_index: chunk_idx,
             byte_offset,
             byte_length,
-            chunks_json,
         });
     }
     Ok(())
@@ -138,15 +124,17 @@ fn pack_chunks<'a>(sections: &'a [Section]) -> Result<(Vec<PackedChunk>, Vec<Sec
     let mut current_raw_buf: Vec<u8> = Vec::new();
     let mut current_chunk_sections: Vec<(&'a Section, u32, u32)> = Vec::new();
     let mut last_valid_compressed: Option<Vec<u8>> = None;
+    let mut current_compressed_len: usize = 0;
     let mut packed_chunks = Vec::new();
     let mut metas = Vec::with_capacity(sections.len());
 
     for sec in sections {
         let body_bytes = sec.body.as_bytes();
+        let needed_raw = body_bytes.len();
 
         if current_raw_buf.is_empty() {
             let offset = 0;
-            let len = body_bytes.len() as u32;
+            let len = needed_raw as u32;
             current_raw_buf.extend_from_slice(body_bytes);
             current_chunk_sections.push((sec, offset, len));
 
@@ -163,30 +151,35 @@ fn pack_chunks<'a>(sections: &'a [Section]) -> Result<(Vec<PackedChunk>, Vec<Sec
                 current_raw_buf.clear();
                 current_chunk_sections.clear();
                 last_valid_compressed = None;
+                current_compressed_len = 0;
                 current_chunk_idx += 1;
             } else {
+                current_compressed_len = compressed.len();
                 last_valid_compressed = Some(compressed);
             }
         } else {
-            let candidate_raw_len = current_raw_buf.len() + body_bytes.len();
-            if candidate_raw_len + 64 <= MAX_COMPRESSED_CHUNK_SIZE {
+            // Deflate expansion invariant: additional raw bytes cannot expand compressed size
+            // by more than (needed_raw + 64). As long as current_compressed_len + needed_raw + 64
+            // is <= MAX_COMPRESSED_CHUNK_SIZE, this chunk is mathematically guaranteed to fit,
+            // entirely eliminating redundant O(N) trial compressions on every single chapter.
+            if current_compressed_len + needed_raw + 64 <= MAX_COMPRESSED_CHUNK_SIZE {
                 let offset = current_raw_buf.len() as u32;
-                let len = body_bytes.len() as u32;
                 current_raw_buf.extend_from_slice(body_bytes);
-                current_chunk_sections.push((sec, offset, len));
+                current_chunk_sections.push((sec, offset, needed_raw as u32));
+                current_compressed_len += needed_raw;
                 last_valid_compressed = None;
             } else {
-                let mut candidate = current_raw_buf.clone();
-                candidate.extend_from_slice(body_bytes);
-                let test_compressed = compress_payload(&candidate)?;
+                let offset = current_raw_buf.len() as u32;
+                current_raw_buf.extend_from_slice(body_bytes);
+                let test_compressed = compress_payload(&current_raw_buf)?;
 
                 if test_compressed.len() <= MAX_COMPRESSED_CHUNK_SIZE {
-                    let offset = current_raw_buf.len() as u32;
-                    let len = body_bytes.len() as u32;
-                    current_raw_buf = candidate;
-                    current_chunk_sections.push((sec, offset, len));
+                    current_chunk_sections.push((sec, offset, needed_raw as u32));
+                    current_compressed_len = test_compressed.len();
                     last_valid_compressed = Some(test_compressed);
                 } else {
+                    // Revert the trial chapter in O(1) without cloning
+                    current_raw_buf.truncate(offset as usize);
                     flush_chunk(
                         current_chunk_idx,
                         &current_raw_buf,
@@ -199,10 +192,9 @@ fn pack_chunks<'a>(sections: &'a [Section]) -> Result<(Vec<PackedChunk>, Vec<Sec
                     current_chunk_sections.clear();
                     current_chunk_idx += 1;
 
-                    let offset = 0;
-                    let len = body_bytes.len() as u32;
+                    // Start fresh chunk with current section
                     current_raw_buf.extend_from_slice(body_bytes);
-                    current_chunk_sections.push((sec, offset, len));
+                    current_chunk_sections.push((sec, 0, needed_raw as u32));
 
                     let compressed = compress_payload(&current_raw_buf)?;
                     if compressed.len() >= MAX_COMPRESSED_CHUNK_SIZE {
@@ -217,8 +209,10 @@ fn pack_chunks<'a>(sections: &'a [Section]) -> Result<(Vec<PackedChunk>, Vec<Sec
                         current_raw_buf.clear();
                         current_chunk_sections.clear();
                         last_valid_compressed = None;
+                        current_compressed_len = 0;
                         current_chunk_idx += 1;
                     } else {
+                        current_compressed_len = compressed.len();
                         last_valid_compressed = Some(compressed);
                     }
                 }
@@ -242,6 +236,9 @@ fn pack_chunks<'a>(sections: &'a [Section]) -> Result<(Vec<PackedChunk>, Vec<Sec
 
 /// Serializes and writes a complete .saga archive container atomically to the destination path.
 fn write_saga_file<'a>(dest_path: &Path, book: &Book, metas: &[SectionMeta<'a>], chunks: &[PackedChunk]) -> Result<(), String> {
+    if let Some(parent) = dest_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
     let file = std::fs::File::create(dest_path).map_err(|e| format!("cannot create saga package {}: {e}", dest_path.display()))?;
     let mut zip = ZipWriter::new(file);
     let stored_opt = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
@@ -253,14 +250,25 @@ fn write_saga_file<'a>(dest_path: &Path, book: &Book, metas: &[SectionMeta<'a>],
 
     // 2. manifest.bin (STORE)
     let mut total_chars = 0u32;
+    let mut volumes: Vec<String> = Vec::new();
+    let mut volume_map = std::collections::HashMap::new();
+    for s in metas {
+        if !s.volume.is_empty() && !volume_map.contains_key(s.volume) {
+            let id = volumes.len() as u16;
+            volume_map.insert(s.volume, id);
+            volumes.push(s.volume.to_string());
+        }
+    }
+
     let package_sections: Vec<protocol::PackageSection> = metas
         .iter()
         .map(|s| {
             let char_count = s.byte_length.saturating_div(3);
             total_chars += char_count;
+            let volume_id = if s.volume.is_empty() { 0 } else { *volume_map.get(s.volume).unwrap_or(&0) };
             protocol::PackageSection {
                 title: s.title.to_string(),
-                volume_id: 0,
+                volume_id,
                 chunk_index: s.chunk_index as u16,
                 chunk_offset: s.byte_offset,
                 byte_length: s.byte_length,
@@ -278,6 +286,7 @@ fn write_saga_file<'a>(dest_path: &Path, book: &Book, metas: &[SectionMeta<'a>],
         description: book.description.clone(),
         total_chars,
         chunks_count: chunks.len() as u32,
+        volumes,
         sections: package_sections,
     };
     let manifest_bytes = manifest.encode();
@@ -319,9 +328,10 @@ pub(super) fn save(conn: &Connection, novel: &Novel, format: &str, books_dir: &P
     let run_tx = || -> Result<(), String> {
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let first_chapter = novel.sections.first().map(|s| s.title.as_str()).unwrap_or("正文");
         tx.execute(
-            "INSERT OR REPLACE INTO books (id, title, author, chapters, format, description, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT OR REPLACE INTO books (id, title, author, chapters, format, description, first_chapter, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 novel.book.id,
                 novel.book.title,
@@ -329,38 +339,14 @@ pub(super) fn save(conn: &Connection, novel: &Novel, format: &str, books_dir: &P
                 novel.book.chapters,
                 format,
                 novel.book.description,
+                first_chapter,
                 now
             ],
         )
         .map_err(|e| format!("failed to save book to db: {}", e))?;
 
-        tx.execute("DELETE FROM sections WHERE book_id = ?1", params![novel.book.id])
-            .map_err(|e| format!("failed to replace old sections: {}", e))?;
-        {
-            let mut stmt = tx
-                .prepare(
-                    "INSERT INTO sections (id, book_id, section_index, title, volume, chunk_index, byte_offset, byte_length, chunks_json)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                )
-                .map_err(|e| e.to_string())?;
-
-            for meta in &metas {
-                stmt.execute(params![
-                    meta.id,
-                    novel.book.id,
-                    meta.index,
-                    meta.title,
-                    meta.volume,
-                    meta.chunk_index,
-                    meta.byte_offset,
-                    meta.byte_length,
-                    meta.chunks_json
-                ])
-                .map_err(|e| e.to_string())?;
-            }
-        }
         crate::review::refresh(&tx, &novel.book.id, &novel.sections)?;
-        tx.commit().map_err(|e| format!("failed to commit sections transaction: {}", e))?;
+        tx.commit().map_err(|e| format!("failed to commit save book transaction: {}", e))?;
         Ok(())
     };
 
@@ -416,36 +402,13 @@ pub(super) fn update(
     write_saga_file(&staging_saga, &book, &metas, &packed_chunks)?;
 
     let run_tx = || -> Result<protocol::NovelValidation, String> {
+        let first_chapter = sections.first().map(|s| s.title.as_str()).unwrap_or("正文");
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-        tx.execute("DELETE FROM sections WHERE book_id = ?1", params![book_id])
-            .map_err(|e| format!("failed to delete old sections: {}", e))?;
-
-        {
-            let mut stmt = tx
-                .prepare(
-                    "INSERT INTO sections (id, book_id, section_index, title, volume, chunk_index, byte_offset, byte_length, chunks_json)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                )
-                .map_err(|e| e.to_string())?;
-
-            for meta in &metas {
-                stmt.execute(params![
-                    meta.id,
-                    book_id,
-                    meta.index,
-                    meta.title,
-                    meta.volume,
-                    meta.chunk_index,
-                    meta.byte_offset,
-                    meta.byte_length,
-                    meta.chunks_json
-                ])
-                .map_err(|e| e.to_string())?;
-            }
-        }
-
-        tx.execute("UPDATE books SET chapters = ?1 WHERE id = ?2", params![sections.len() as u32, book_id])
-            .map_err(|e| format!("failed to update book chapters count: {}", e))?;
+        tx.execute(
+            "UPDATE books SET chapters = ?1, first_chapter = ?2 WHERE id = ?3",
+            params![sections.len() as u32, first_chapter, book_id],
+        )
+        .map_err(|e| format!("failed to update book chapters count: {}", e))?;
 
         let report = crate::review::replace(&tx, book_id, sections, retained)?;
         tx.commit().map_err(|e| format!("failed to commit updated sections transaction: {}", e))?;
@@ -492,8 +455,6 @@ pub(super) fn delete(conn: &Connection, book_id: &str, books_dir: &Path) -> Resu
     let tx = conn.unchecked_transaction().map_err(|error| error.to_string())?;
     tx.execute("DELETE FROM reviews WHERE book_id = ?1", params![book_id])
         .map_err(|error| error.to_string())?;
-    tx.execute("DELETE FROM sections WHERE book_id = ?1", params![book_id])
-        .map_err(|error| error.to_string())?;
     tx.execute("DELETE FROM books WHERE id = ?1", params![book_id])
         .map_err(|error| error.to_string())?;
 
@@ -502,10 +463,6 @@ pub(super) fn delete(conn: &Connection, book_id: &str, books_dir: &Path) -> Resu
         Ok(()) => {}
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => return Err(format!("cannot remove {}: {error}", saga_path.display())),
-    }
-    let legacy_dir = books_dir.join(book_id);
-    if legacy_dir.is_dir() {
-        let _ = std::fs::remove_dir_all(&legacy_dir);
     }
     tx.commit().map_err(|error| format!("cannot commit book deletion: {error}"))
 }
@@ -531,7 +488,7 @@ pub(super) fn all(conn: &Connection, books_dir: &Path) -> Result<Vec<Novel>, Str
     let mut novels = Vec::new();
     for book_res in book_iter {
         let book = book_res.map_err(|e| e.to_string())?;
-        let sections = sections(conn, &book.id, books_dir)?;
+        let sections = sections(&book.id, books_dir)?;
 
         novels.push(Novel { book, sections });
     }
@@ -543,9 +500,8 @@ pub(super) fn all(conn: &Connection, books_dir: &Path) -> Result<Vec<Novel>, Str
 pub(super) fn summaries(conn: &Connection) -> Result<Vec<BookSummary>, String> {
     let mut statement = conn
         .prepare(
-            "SELECT books.id, books.title, books.author, books.chapters, books.format, books.description,
-         COALESCE((SELECT sections.title FROM sections WHERE sections.book_id = books.id ORDER BY section_index LIMIT 1), '正文')
-         FROM books ORDER BY created_at DESC, books.id",
+            "SELECT id, title, author, chapters, format, description, first_chapter
+             FROM books ORDER BY created_at DESC, id",
         )
         .map_err(|error| error.to_string())?;
     let rows = statement
@@ -587,58 +543,57 @@ pub(super) fn load(conn: &Connection, book_id: &str, books_dir: &Path) -> Result
         return Ok(None);
     };
 
-    let sections = sections(conn, &book.id, books_dir)?;
+    let sections = sections(&book.id, books_dir)?;
     Ok(Some(Novel { book, sections }))
 }
 
-/// Decodes stored sections from segmented compressed chunks inside the .saga archive container.
-fn sections(conn: &Connection, book_id: &str, books_dir: &Path) -> Result<Vec<Section>, String> {
-    let mut sec_stmt = conn
-        .prepare(
-            "SELECT id, section_index, title, volume, chunk_index, byte_offset, byte_length, chunks_json
-             FROM sections WHERE book_id = ?1 ORDER BY section_index ASC",
-        )
-        .map_err(|e| e.to_string())?;
-
-    let sec_rows = sec_stmt
-        .query_map(params![book_id], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, u32>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, u32>(4)?,
-                row.get::<_, u32>(5)?,
-                row.get::<_, u32>(6)?,
-                row.get::<_, String>(7)?,
-            ))
-        })
-        .map_err(|e| e.to_string())?;
-
+/// Decodes stored sections directly from manifest.bin and segmented compressed chunks inside the .saga archive container.
+fn sections(book_id: &str, books_dir: &Path) -> Result<Vec<Section>, String> {
     let saga_path = books_dir.join(format!("{book_id}.saga"));
     let saga_file = std::fs::File::open(&saga_path).map_err(|e| format!("cannot open saga package {}: {e}", saga_path.display()))?;
     let mut zip = ZipArchive::new(saga_file).map_err(|e| format!("cannot open saga zip archive {}: {e}", saga_path.display()))?;
 
-    let mut sections = Vec::new();
+    let manifest_bytes = {
+        let mut manifest_entry = zip
+            .by_name("manifest.bin")
+            .map_err(|e| format!("cannot find manifest.bin in {}: {e}", saga_path.display()))?;
+        let mut bytes = Vec::new();
+        manifest_entry.read_to_end(&mut bytes).map_err(|e| format!("cannot read manifest.bin: {e}"))?;
+        bytes
+    };
+
+    let manifest_view =
+        protocol::PackageManifestView::parse(&manifest_bytes).map_err(|e| format!("failed to parse manifest.bin in {}: {e}", saga_path.display()))?;
+
+    let count = manifest_view.sections_count();
+    let mut sections = Vec::with_capacity(count as usize);
     let mut cached_chunk_idx: Option<u32> = None;
     let mut cached_raw_buf: Vec<u8> = Vec::new();
 
-    for row_res in sec_rows {
-        let (id, index, title, volume, chunk_index, byte_offset, byte_length, chunks_str) = row_res.map_err(|e| e.to_string())?;
-        if cached_chunk_idx != Some(chunk_index) {
-            let entry_name = format!("texts/{chunk_index}.chunk");
-            let mut chunk_entry = zip
-                .by_name(&entry_name)
-                .map_err(|e| format!("cannot find chunk entry {entry_name} in {}: {e}", saga_path.display()))?;
-            let mut compressed = Vec::new();
-            chunk_entry
-                .read_to_end(&mut compressed)
-                .map_err(|e| format!("cannot read chunk entry {entry_name}: {e}"))?;
+    for i in 0..count {
+        let pkg_sec = manifest_view
+            .section_at(i)
+            .map_err(|e| format!("failed to read section {i} from manifest: {e}"))?;
+        let chunk_idx = pkg_sec.chunk_index as u32;
+
+        if cached_chunk_idx != Some(chunk_idx) {
+            let entry_name = format!("texts/{chunk_idx}.chunk");
+            let compressed = {
+                let mut chunk_entry = zip
+                    .by_name(&entry_name)
+                    .map_err(|e| format!("cannot find chunk entry {entry_name} in {}: {e}", saga_path.display()))?;
+                let mut compressed = Vec::new();
+                chunk_entry
+                    .read_to_end(&mut compressed)
+                    .map_err(|e| format!("cannot read chunk entry {entry_name}: {e}"))?;
+                compressed
+            };
             cached_raw_buf = decompress_payload(&compressed)?;
-            cached_chunk_idx = Some(chunk_index);
+            cached_chunk_idx = Some(chunk_idx);
         }
-        let start = byte_offset as usize;
-        let end = start + byte_length as usize;
+
+        let start = pkg_sec.chunk_offset as usize;
+        let end = start + pkg_sec.byte_length as usize;
         if end > cached_raw_buf.len() {
             return Err(format!(
                 "byte range {}..{} exceeds decompressed chunk length {}",
@@ -647,20 +602,20 @@ fn sections(conn: &Connection, book_id: &str, books_dir: &Path) -> Result<Vec<Se
                 cached_raw_buf.len()
             ));
         }
+
         let body = std::str::from_utf8(&cached_raw_buf[start..end])
-            .map_err(|e| format!("invalid UTF-8 in decompressed chunk {chunk_index}: {e}"))?
+            .map_err(|e| format!("invalid UTF-8 in decompressed chunk {chunk_idx}: {e}"))?
             .to_string();
 
-        let chunks: Vec<protocol::Chunk> = if chunks_str.is_empty() {
-            Vec::new()
-        } else {
-            serde_json::from_str(&chunks_str).map_err(|error| format!("corrupted chunks in section {id}: {error}"))?
-        };
+        let volume = manifest_view.volume_at(pkg_sec.volume_id).unwrap_or("").to_string();
+
+        let sec_id = format!("{book_id}:{i}");
+        let chunks = reader::split_sentences(&body, &sec_id);
 
         sections.push(Section {
-            id,
-            index,
-            title,
+            id: sec_id,
+            index: i,
+            title: pkg_sec.title,
             volume,
             body,
             chunks,
@@ -675,6 +630,9 @@ pub(super) fn export_saga(_conn: &Connection, book_id: &str, books_dir: &Path, o
     let source_saga = books_dir.join(format!("{book_id}.saga"));
     if !source_saga.exists() {
         return Err(format!("cannot find saga package for book {book_id} at {}", source_saga.display()));
+    }
+    if let Some(parent) = output_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
     }
     std::fs::copy(&source_saga, output_path).map_err(|e| format!("cannot export saga package to {}: {e}", output_path.display()))?;
     Ok(())
@@ -742,45 +700,13 @@ pub(super) fn import_saga(conn: &Connection, archive_path: &Path, books_dir: &Pa
 
     let run_tx = || -> Result<(), String> {
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let first_chapter = manifest.sections.first().map(|s| s.title.as_str()).unwrap_or("正文");
         tx.execute(
-            "INSERT OR REPLACE INTO books (id, title, author, chapters, format, description, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![book.id, book.title, book.author, book.chapters, "SAGA", book.description, now],
+            "INSERT OR REPLACE INTO books (id, title, author, chapters, format, description, first_chapter, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![book.id, book.title, book.author, book.chapters, "SAGA", book.description, first_chapter, now],
         )
         .map_err(|e| format!("failed to insert book record: {e}"))?;
-
-        tx.execute("DELETE FROM sections WHERE book_id = ?1", params![book.id])
-            .map_err(|e| format!("failed to clean old sections: {e}"))?;
-
-        {
-            let mut stmt = tx
-                .prepare(
-                    "INSERT INTO sections (id, book_id, section_index, title, volume, chunk_index, byte_offset, byte_length, chunks_json)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                )
-                .map_err(|e| e.to_string())?;
-
-            for (idx, sec) in manifest.sections.iter().enumerate() {
-                let sec_id = format!("{book_id}:{idx}");
-                let volume = if sec.volume_id > 0 {
-                    format!("第{}卷", sec.volume_id)
-                } else {
-                    "正文".to_string()
-                };
-                stmt.execute(params![
-                    sec_id,
-                    book.id,
-                    idx as u32,
-                    sec.title,
-                    volume,
-                    sec.chunk_index as u32,
-                    sec.chunk_offset,
-                    sec.byte_length,
-                    ""
-                ])
-                .map_err(|e| e.to_string())?;
-            }
-        }
 
         tx.commit().map_err(|e| format!("failed to commit saga import transaction: {e}"))?;
         Ok(())
@@ -800,7 +726,7 @@ pub(super) fn import_saga(conn: &Connection, archive_path: &Path, books_dir: &Pa
     }
 
     // 6. Hydrate sections for Novel and validation directly from target_saga
-    let loaded_sections = sections(conn, &book_id, books_dir)?;
+    let loaded_sections = sections(&book_id, books_dir)?;
     let validation = crate::review::inspect(conn, &book_id, &loaded_sections)?;
 
     Ok(protocol::NovelImportResult {
@@ -826,21 +752,28 @@ mod tests {
                 chapters: count,
             },
             sections: (0..count)
-                .map(|index| Section {
-                    id: format!("fixture:{}", index),
-                    index,
-                    title: format!("Chapter {}", index),
-                    volume: "Volume".into(),
-                    body: "Text".into(),
-                    chunks: Vec::new(),
+                .map(|index| {
+                    let id = format!("fixture:{}", index);
+                    let body = "Text".to_string();
+                    let chunks = reader::split_sentences(&body, &id);
+                    Section {
+                        id,
+                        index,
+                        title: format!("Chapter {}", index),
+                        volume: "Volume".into(),
+                        body,
+                        chunks,
+                    }
                 })
                 .collect(),
         }
     }
 
     fn test_books_dir() -> std::path::PathBuf {
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let id = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-        let dir = std::env::temp_dir().join(format!("saga-storage-test-{}-{}", std::process::id(), stamp));
+        let dir = std::env::temp_dir().join(format!("saga-storage-test-{}-{}-{id}", std::process::id(), stamp));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -865,12 +798,11 @@ mod tests {
         let original = sample(4);
         save(&conn, &original, "TXT", &dir).unwrap();
         conn.execute_batch(
-            "CREATE TRIGGER reject_import BEFORE INSERT ON sections WHEN NEW.title = 'Reject' BEGIN SELECT RAISE(ABORT, 'fixture failure'); END;",
+            "CREATE TRIGGER reject_import BEFORE INSERT ON books WHEN NEW.title = 'Replacement' BEGIN SELECT RAISE(ABORT, 'fixture failure'); END;",
         )
         .unwrap();
         let mut replacement = sample(2);
         replacement.book.title = "Replacement".into();
-        replacement.sections[1].title = "Reject".into();
         assert!(save(&conn, &replacement, "TXT", &dir).is_err());
         assert_eq!(load(&conn, "fixture", &dir).unwrap().unwrap(), original);
         std::fs::remove_dir_all(&dir).unwrap();
@@ -942,13 +874,18 @@ mod tests {
         // With Deflate on hex strings (~50% ratio), total compressed size will be ~430 KB > 256 KB,
         // which forces greedy packing across at least 2 chunk files.
         let sections: Vec<Section> = (0..12)
-            .map(|i| Section {
-                id: format!("large:{i}"),
-                index: i,
-                title: format!("Chapter {i}"),
-                volume: "正文".to_string(),
-                body: format!("Chapter {i} body: {}", next_text(8_000)),
-                chunks: vec![],
+            .map(|i| {
+                let id = format!("large:{i}");
+                let body = format!("Chapter {i} body: {}", next_text(8_000));
+                let chunks = reader::split_sentences(&body, &id);
+                Section {
+                    id,
+                    index: i,
+                    title: format!("Chapter {i}"),
+                    volume: "正文".to_string(),
+                    body,
+                    chunks,
+                }
             })
             .collect();
 
@@ -991,14 +928,20 @@ mod tests {
         }
         assert!(chunk_count >= 2, "must have created at least 2 chunks");
 
-        // 3. Verify sections table schema and chunk_index monotonicity
-        let chunk_indices: Vec<u32> = conn
-            .prepare("SELECT chunk_index FROM sections WHERE book_id = 'large' ORDER BY section_index ASC")
-            .unwrap()
-            .query_map([], |row| row.get(0))
-            .unwrap()
-            .collect::<Result<_, _>>()
-            .unwrap();
+        // 3. Verify manifest.bin chunk_index monotonicity
+        let saga_bytes = std::fs::read(&saga_path).unwrap();
+        let mut zip = ZipArchive::new(std::io::Cursor::new(&saga_bytes)).unwrap();
+        let manifest_bytes = {
+            let mut manifest_entry = zip.by_name("manifest.bin").unwrap();
+            let mut manifest_buf = Vec::new();
+            manifest_entry.read_to_end(&mut manifest_buf).unwrap();
+            manifest_buf
+        };
+        let manifest_view = protocol::PackageManifestView::parse(&manifest_bytes).unwrap();
+        assert_eq!(manifest_view.sections_count(), 12);
+        let chunk_indices: Vec<u16> = (0..manifest_view.sections_count())
+            .map(|i| manifest_view.section_at(i).unwrap().chunk_index)
+            .collect();
         assert_eq!(chunk_indices.len(), 12);
         assert!(chunk_indices.contains(&0) && chunk_indices.contains(&1));
         assert!(chunk_indices.windows(2).all(|w| w[0] <= w[1]));

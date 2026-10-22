@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /** Application navigation and global input ownership. */
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, watch, onMounted, onUnmounted } from "vue";
 import ShelfView from "./views/Shelf.vue";
 import ReaderView from "./views/Reader.vue";
 import AuditView from "./views/Audit.vue";
 import ProfileView from "./views/Profile.vue";
 import SettingsView from "./views/Settings.vue";
 import MiniBar from "./components/Bar.vue";
-import { togglePlay, nextSentence, prevSentence, activeAuditReport, pause, hasAudio } from "./stores/library";
+import { togglePlay, nextSentence, prevSentence, activeAuditReport, pause, hasAudio, isGlobalBusy } from "./stores/library";
 
 type TabType = "shelf" | "reader" | "audit" | "settings" | "profile";
 
@@ -16,10 +16,17 @@ const isCollapsed = ref(false);
 const historyStack = ref<TabType[]>(["shelf"]);
 const historyIndex = ref(0);
 
-function switchTab(tab: TabType, pushHistory = true): void {
+function switchTab(tab: TabType, pushHistory: boolean | "replace" = true, force = false): void {
+  if (!force && isGlobalBusy?.value) return;
   if (currentTab.value === tab) return;
+
+  const previousTab = currentTab.value;
   currentTab.value = tab;
-  if (pushHistory) {
+
+  if (pushHistory === "replace" || previousTab === "audit") {
+    historyStack.value[historyIndex.value] = tab;
+    historyStack.value = historyStack.value.filter((t, i) => t !== "audit" || i === historyIndex.value);
+  } else if (pushHistory === true) {
     historyStack.value = historyStack.value.slice(0, historyIndex.value + 1);
     historyStack.value.push(tab);
     historyIndex.value = historyStack.value.length - 1;
@@ -27,22 +34,53 @@ function switchTab(tab: TabType, pushHistory = true): void {
 }
 
 function goBack(): void {
-  if (historyIndex.value > 0) {
+  if (isGlobalBusy?.value) return;
+  while (historyIndex.value > 0) {
     historyIndex.value -= 1;
-    currentTab.value = historyStack.value[historyIndex.value];
-  } else if (currentTab.value !== "shelf") {
+    const target = historyStack.value[historyIndex.value];
+    if (target === "audit" && (!activeAuditReport.value || activeAuditReport.value.anomalies.length === 0)) {
+      continue;
+    }
+    currentTab.value = target;
+    return;
+  }
+  if (currentTab.value !== "shelf") {
     switchTab("shelf", false);
   }
 }
 
 function goForward(): void {
-  if (historyIndex.value < historyStack.value.length - 1) {
+  if (isGlobalBusy?.value) return;
+  while (historyIndex.value < historyStack.value.length - 1) {
     historyIndex.value += 1;
-    currentTab.value = historyStack.value[historyIndex.value];
+    const target = historyStack.value[historyIndex.value];
+    if (target === "audit" && (!activeAuditReport.value || activeAuditReport.value.anomalies.length === 0)) {
+      continue;
+    }
+    currentTab.value = target;
+    return;
   }
 }
 
+watch(activeAuditReport, (report) => {
+  if (!report || report.anomalies.length === 0) {
+    historyStack.value = historyStack.value.filter((t) => t !== "audit");
+    if (historyStack.value.length === 0) {
+      historyStack.value = ["shelf"];
+    }
+    historyIndex.value = Math.min(historyIndex.value, historyStack.value.length - 1);
+    if (currentTab.value === "audit") {
+      currentTab.value = "shelf";
+    }
+  }
+});
+
 function handleMouseNavigation(e: MouseEvent): void {
+  if (isGlobalBusy?.value) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
   if (e.button === 3) {
     // Mouse Back (XButton1)
     e.preventDefault();
@@ -57,10 +95,16 @@ function handleMouseNavigation(e: MouseEvent): void {
 }
 
 function toggleSidebar(): void {
+  if (isGlobalBusy?.value) return;
   isCollapsed.value = !isCollapsed.value;
 }
 
 function handleGlobalKeydown(e: KeyboardEvent): void {
+  if (isGlobalBusy?.value) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
   if (currentTab.value === "reader" || currentTab.value === "audit" || e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
   // Preserve native editing and focused control activation.
   const activeEl = document.activeElement;
@@ -95,7 +139,7 @@ onUnmounted(() => {
 <template>
   <div class="saga-app">
     <!-- Desktop Left Sidebar -->
-    <aside class="sidebar" :class="{ collapsed: isCollapsed }">
+    <aside class="sidebar" :class="{ collapsed: isCollapsed, 'busy-locked': !!isGlobalBusy }" :inert="!!isGlobalBusy">
       <div class="brand-block" title="点击折叠/展开侧边栏" @click="toggleSidebar">
         <img src="/logo.png" class="brand-logo" alt="Saga" />
         <span v-show="!isCollapsed" class="brand-title">Saga</span>
@@ -166,13 +210,13 @@ onUnmounted(() => {
       <div class="view-viewport">
         <ShelfView
           v-if="currentTab === 'shelf'"
-          @open-reader="switchTab('reader')"
-          @open-audit="switchTab('audit')"
+          @open-reader="switchTab('reader', true, true)"
+          @open-audit="switchTab('audit', true, true)"
         />
         <AuditView
-          v-else-if="currentTab === 'audit'"
-          @open-reader="switchTab('reader')"
-          @back-to-shelf="switchTab('shelf')"
+          v-else-if="currentTab === 'audit' && activeAuditReport && activeAuditReport.anomalies.length > 0"
+          @open-reader="switchTab('reader', 'replace', true)"
+          @back-to-shelf="switchTab('shelf', 'replace', true)"
         />
         <ReaderView v-else-if="currentTab === 'reader'" @back-to-shelf="goBack" />
         <SettingsView v-else-if="currentTab === 'settings'" />
@@ -184,7 +228,7 @@ onUnmounted(() => {
     </main>
 
     <!-- Mobile Adaptive Bottom TabBar (shown on narrow screens) -->
-    <nav class="mobile-tabbar">
+    <nav class="mobile-tabbar" :class="{ 'busy-locked': !!isGlobalBusy }" :inert="!!isGlobalBusy">
       <button
         class="tab-btn"
         :class="{ active: currentTab === 'shelf' }"
@@ -245,6 +289,14 @@ onUnmounted(() => {
   flex-shrink: 0;
   user-select: none;
   transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), padding 0.22s ease;
+}
+
+.sidebar.busy-locked,
+.mobile-tabbar.busy-locked {
+  pointer-events: none !important;
+  opacity: 0.6;
+  filter: grayscale(0.6);
+  cursor: not-allowed !important;
 }
 
 .sidebar.collapsed {

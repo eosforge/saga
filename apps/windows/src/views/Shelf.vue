@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** TXT import, catalog filtering, and native event subscription lifecycle. */
-import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import {
   books,
@@ -17,6 +17,7 @@ import {
   activeAuditReport,
   activeAuditNovel,
   showHeroBanner,
+  isGlobalBusy,
   type BookItem
 } from "../stores/library";
 import type { NovelImportResult } from "../../../../protocol/bindings/NovelImportResult";
@@ -43,6 +44,10 @@ const importDetailText = ref("");
 const importPercent = ref(0);
 const importMeasured = ref(false);
 const bookToDelete = ref<BookItem | null>(null);
+
+watch(isImporting, (val) => {
+  if (isGlobalBusy) isGlobalBusy.value = val;
+});
 
 function showToast(msg: string): void {
   toastMessage.value = msg;
@@ -267,6 +272,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   disposed = true;
+  if (isGlobalBusy) isGlobalBusy.value = false;
   if (toastTimer) clearTimeout(toastTimer);
   if (unlistenDragDrop) {
     unlistenDragDrop();
@@ -418,18 +424,17 @@ onUnmounted(() => {
           <div class="import-progress-container">
             <div
               class="import-progress-track"
-              :class="{ pending: !importMeasured }"
               role="progressbar"
               :aria-label="importPhaseTitle"
-              :aria-valuenow="importMeasured ? importPercent : undefined"
+              :aria-valuenow="importPercent"
               :aria-valuemin="0"
               :aria-valuemax="100"
             >
-              <div class="import-progress-fill" :style="{ width: importMeasured ? `${importPercent}%` : '35%' }"></div>
+              <div class="import-progress-fill" :style="{ width: `${importPercent}%` }"></div>
             </div>
             <div class="import-progress-meta">
               <span class="import-progress-detail">{{ importDetailText || '处理中...' }}</span>
-              <span class="import-progress-percent">{{ importMeasured ? `${importPercent}%` : '处理中' }}</span>
+              <span class="import-progress-percent">{{ importPercent }}%</span>
             </div>
           </div>
 
@@ -1035,7 +1040,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  z-index: 99999;
   pointer-events: all;
   user-select: none;
 }
@@ -1105,15 +1110,6 @@ onUnmounted(() => {
   background: linear-gradient(90deg, #0284c7, #38bdf8);
   border-radius: 4px;
   transition: width 0.25s ease-out;
-}
-
-.import-progress-track.pending .import-progress-fill {
-  animation: progress 1.2s ease-in-out infinite;
-}
-
-@keyframes progress {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(290%); }
 }
 
 .import-progress-meta {

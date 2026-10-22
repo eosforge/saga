@@ -18,6 +18,7 @@ function fixture(loading = Promise.resolve()) {
   };
   const library = {
     activeBook: vue.ref({ id: "book", sections: [], currentChapterIndex: 0 }),
+    activeAuditReport: vue.ref(null), isGlobalBusy: vue.ref(false),
     failure: vue.ref(""), activeSentenceIndex: vue.ref(0), isPlaying: vue.ref(false), hasAudio: vue.ref(true),
     ensureBookLoaded: () => loading, togglePlay: () => { toggles++; }, pause() {}
   };
@@ -31,7 +32,7 @@ function fixture(loading = Promise.resolve()) {
     runInNewContext(code, {
       exports, window, document, defineEmits: () => () => {},
       require(name) {
-        if (name === "vue") return { ...vue, watch() {}, onMounted: callback => { lifecycle.mount = callback; }, onUnmounted: callback => { lifecycle.unmount = callback; } };
+        if (name === "vue") return { ...vue, watch: vue.watch, onMounted: callback => { lifecycle.mount = callback; }, onUnmounted: callback => { lifecycle.unmount = callback; } };
         if (name.endsWith("stores/library")) return library;
         if (name.endsWith(".vue")) return {};
         if (name === "../text") return require("./support/loader.cjs")()("text.ts");
@@ -108,4 +109,28 @@ test("reading settings own their keys, focus the range, and dismiss with Escape 
   await reader.configure();
   reader.dismiss({ target: "outside" });
   assert.equal(reader.settings.value, false);
+});
+
+test("navigating from audit replaces audit in history and back from reader returns to shelf", async () => {
+  const ui = fixture();
+  ui.library.activeAuditReport = vue.ref({ anomalies: [{ key: "a1" }] });
+  const app = ui.component("App.vue", "currentTab, switchTab, goBack, historyStack, historyIndex");
+  assert.equal(app.currentTab.value, "shelf");
+  assert.deepEqual(Array.from(app.historyStack.value), ["shelf"]);
+
+  // User opens audit
+  app.switchTab("audit");
+  assert.equal(app.currentTab.value, "audit");
+  assert.deepEqual(Array.from(app.historyStack.value), ["shelf", "audit"]);
+
+  // User saves and navigates to reader (audit destroyed)
+  ui.library.activeAuditReport.value = null;
+  app.switchTab("reader", "replace", true);
+  assert.equal(app.currentTab.value, "reader");
+  assert.deepEqual(Array.from(app.historyStack.value), ["shelf", "reader"]);
+
+  // User clicks back: goes directly to shelf, completely bypassing audit
+  app.goBack();
+  assert.equal(app.currentTab.value, "shelf");
+  assert.equal(app.historyStack.value.includes("audit"), false);
 });

@@ -15,14 +15,16 @@ fn analyze(sections: &[Section]) -> Result<NovelValidation, String> {
                 .map_err(|error| error.to_string())
         })
         .collect::<Result<_, _>>()?;
+
+    let mut title_map: std::collections::HashMap<(&str, &str), Vec<&String>> = std::collections::HashMap::with_capacity(sections.len());
+    for (section, hash) in sections.iter().zip(&hashes) {
+        title_map.entry((section.title.as_str(), section.volume.as_str())).or_default().push(hash);
+    }
+
+    let empty_vec = Vec::new();
     for anomaly in &mut report.anomalies {
         let index = anomaly.section_index as usize;
-        let related: Vec<&String> = sections
-            .iter()
-            .zip(&hashes)
-            .filter(|(section, _)| section.title == anomaly.title && section.volume == anomaly.volume)
-            .map(|(_, hash)| hash)
-            .collect();
+        let related = title_map.get(&(anomaly.title.as_str(), anomaly.volume.as_str())).unwrap_or(&empty_vec);
         let bytes = serde_json::to_vec(&(
             "retain-v1",
             &anomaly.anomaly_type,
@@ -104,8 +106,10 @@ mod tests {
     }
 
     fn setup() -> (Connection, protocol::Novel, std::path::PathBuf) {
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let id = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-        let temp_dir = std::env::temp_dir().join(format!("saga-review-test-{}-{}", std::process::id(), stamp));
+        let temp_dir = std::env::temp_dir().join(format!("saga-review-test-{}-{}-{id}", std::process::id(), stamp));
         std::fs::create_dir_all(&temp_dir).unwrap();
         let conn = Connection::open_in_memory().unwrap();
         storage::initialize(&conn).unwrap();

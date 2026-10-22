@@ -34,8 +34,8 @@ apps/windows/native/icons/source.png 是 PNG/ICO/ICNS 及浏览器资产的共�
 ## 数据流与限制
 
 1. 原生选择框返回 TXT 路径。导入读取字节、计算 BLAKE3 标识、解码文本并选定章节边界。
-2. SQLite 存储书籍元数据、有序章节索引与分块偏移量，以及已保留的核验指纹。所有章节正文与 Deflate 压缩分块（严格限制在 256 KB 以内）直接打包封装为单文件 `.saga` 归档容器并保存在 `books/<book-id>.saga` 下，磁盘上不创建任何书籍子目录。重导入在一个原子事务中替换元数据与 `.saga` 归档文件；核验保存同时提交章节及决策。
-3. 书架先加载摘要，选择书籍后再加载章节。重复请求共享进行中的加载。通过书籍对象标识，防止延迟响应覆盖重导入结果或使已删除书籍重新出现。
+2. SQLite 仅存储书籍基础元数据、首章标题以及已保留的核验指纹。所有章节目录索引与 TOC 数据直接由 $O(1)$ 二进制清单（`manifest.bin`）与 Deflate 压缩切片（严格限制在 256 KB 以内）在单文件 `.saga` 归档容器（`books/<book-id>.saga`）中承载，SQLite 中彻底消除冗余的 `sections` 章节数据表。重导入在一个原子事务中替换元数据与 `.saga` 归档文件；核验保存同时提交决策并原子替换 `.saga` 归档。
+3. 书架直接从极简 SQLite `books` 表读取轻量摘要，不触发任何归档文件读取。启动时后台预热最近阅读书籍实现 0ms 秒开。选择书籍时按需直接从 `manifest.bin` 与切片中水合章节正文。重复请求共享进行中的加载。通过书籍对象标识，防止延迟响应覆盖重导入结果或使已删除书籍重新出现。
 4. 缺少持久化分句时，阅读器按需分句。浏览器预览将完整 TXT 作为单个临时章节保存在内存中，不经过原生解析。
 
 调试数据位于编译时检出目录的 data/ 下。打包构建使用操作系统的应用本地数据目录。布局为 `storage/saga.db` 和单归档包 `books/<book-id>.saga`。移动检出目录后须重建调试程序；已有程序保留编译时的源码位置。
@@ -82,25 +82,30 @@ my_novel.saga (标准确定性 ZIP 容器)
    - `sections_count`: `u32` 结构化章节总数。
    - `chunks_count`: `u32` `texts/` 下正文切片文件总数。
    - `total_chars`: `u32` 全书总字数。
+   - `volumes_offset`: `u32` 分卷偏移量表的字节偏移。
    - `title_ptr`: `[offset: u32, len: u16]` 指向字符串池中的书名。
    - `author_ptr`: `[offset: u32, len: u16]` 指向字符串池中的作者名。
    - `desc_ptr`: `[offset: u32, len: u16]` 指向字符串池中的简介。
-   - `toc_offset`: `u64` 定长 TOC 数组起始字节偏移。
-   - `string_pool_offset`: `u64` UTF-8 文本属性起始字节偏移。
-   - `reserved`: 20 字节保留用于未来模式扩展。
-2. **章节目录项 TOC Entries (每章 32 字节，严格 8 字节对齐)**:
+   - `toc_offset`: `u32` 定长 TOC 数组起始字节偏移。
+   - `volume_count`: `u16` 分卷总数。
+   - `string_pool_offset`: `u32` UTF-8 文本属性起始字节偏移。
+   - `reserved`: 12 字节保留用于未来模式扩展。
+2. **分卷表 Volume Table (每卷 6 字节，$O(1)$ 查找)**:
+   - `offset`: `u32` 字符串池中的字节偏移。
+   - `length`: `u16` 分卷名称 UTF-8 字节长度。
+3. **章节目录项 TOC Entries (每章 32 字节，严格 8 字节对齐)**:
    - `chunk_index`: `u16` 引用 `texts/{chunk_index}.chunk`。
    - `flags`: `u16` 标志位（bit 0 表示伴读音频可用性）。
    - `chunk_offset`: `u32` 解压后切片内的未压缩字节起始位置。
    - `byte_length`: `u32` 未压缩章节文本字节长度。
    - `char_count`: `u32` 章节字符数（用于进度计算）。
-   - `volume_id`: `u16` 卷序号。
+   - `volume_id`: `u16` 分卷索引序号（引用分卷表）。
    - `title_offset`: `u32` 标题在字符串池中的相对偏移量。
    - `title_length`: `u16` 标题 UTF-8 字节长度。
    - `audio_duration_ms`: `u32` 章节音频总毫秒时长。
    - `timeline_offset`: `u32` 该章句子跨度在 `timeline.bin` 中的字节偏移量。
-3. **字符串池 String Pool**:
-   - 连续紧密排列的 UTF-8 字节序列，保存书名、作者、简介及章节标题。
+4. **字符串池 String Pool**:
+   - 连续紧密排列的 UTF-8 字节序列，保存书名、作者、简介、分卷名及章节标题。
 
 ### 3. 出版物资产与用户状态分离
 

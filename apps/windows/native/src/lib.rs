@@ -93,13 +93,13 @@ fn ingest(app: &tauri::AppHandle, path_str: String) -> Result<NovelImportResult,
     .map_err(|e| e.to_string())?;
     drop(decoded);
 
-    report("validating", "正在检查卷章顺序...", 80);
-    report("persisting", "正在保存书籍与章节...", 85);
+    report("persisting", "正在打包 .saga 归档并持久化...", 75);
     let books_dir = paths::directory(app, "books")?;
     let conn = storage::open(&paths::directory(app, "storage")?.join("saga.db"))?;
     storage::save(&conn, &novel, "TXT", &books_dir)?;
+    report("validating", "正在检查卷章顺序与核验规则...", 90);
     let validation = review::inspect(&conn, &book_id, &novel.sections)?;
-    report("completed", "正在加载分析结果...", 99);
+    report("completed", "导入完成，正在进入...", 100);
 
     Ok(NovelImportResult { novel, validation })
 }

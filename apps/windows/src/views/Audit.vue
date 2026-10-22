@@ -6,7 +6,8 @@ import {
   activeAuditNovel,
   activeBook,
   saveAuditedSections,
-  selectBook
+  selectBook,
+  isGlobalBusy
 } from "../stores/library";
 import type { Section } from "../../../../protocol/bindings/Section";
 import type { ValidationAnomaly } from "../../../../protocol/bindings/ValidationAnomaly";
@@ -38,7 +39,13 @@ const filterType = ref<string>("PENDING");
 const resolvedMap = ref<Record<number, ResolutionRecord>>({});
 const historyStack = ref<HistoryStep[]>([]);
 const isSaving = ref(false);
+const savePercent = ref(0);
+const savePhaseText = ref("正在准备数据...");
 const failure = ref('');
+
+watch(isSaving, (val) => {
+  if (isGlobalBusy) isGlobalBusy.value = val;
+});
 
 const renderedSections = ref<Section[]>([]);
 const activePopoverSection = ref<Section | null>(null);
@@ -469,8 +476,11 @@ async function saveAndOpenReader(): Promise<void> {
   if (isSaving.value) return;
   const identity = bookId.value;
   isSaving.value = true;
+  savePercent.value = 10;
+  savePhaseText.value = "正在整理章节结构与决议...";
   failure.value = "";
 
+  let progressTimer: any = null;
   try {
     const normalized = clone(sections.value);
     const retained = anomalies.value.filter(item => resolvedMap.value[item.anomalyId]?.action === "accepted").map(item => item.key);
@@ -483,24 +493,63 @@ async function saveAndOpenReader(): Promise<void> {
       });
     });
 
+    savePercent.value = 45;
+    savePhaseText.value = "正在写入 .saga 归档并更新索引...";
+
+    if (typeof setInterval !== "undefined") {
+      progressTimer = setInterval(() => {
+        if (savePercent.value < 88) {
+          savePercent.value += 6;
+        }
+      }, 120);
+    }
+
     await saveAuditedSections(identity, normalized, retained);
+
+    if (progressTimer !== null && typeof clearInterval !== "undefined") {
+      clearInterval(progressTimer);
+      progressTimer = null;
+    }
+
+    savePercent.value = 100;
+    savePhaseText.value = "保存完成，正在进入阅读...";
+
     activeAuditReport.value = null;
     activeAuditNovel.value = null;
+    clearAuditState();
 
     selectBook(identity);
-    emit("open-reader");
   } catch (err) {
+    if (progressTimer !== null && typeof clearInterval !== "undefined") {
+      clearInterval(progressTimer);
+      progressTimer = null;
+    }
     failure.value = `保存失败，修改仍留在当前页面，请重试：${err}`;
     console.error("Save audited sections failed:", err);
   } finally {
     isSaving.value = false;
+    if (isGlobalBusy) isGlobalBusy.value = false;
   }
+
+  if (!failure.value) {
+    emit("open-reader");
+  }
+}
+
+function clearAuditState(): void {
+  sections.value = [];
+  anomalies.value = [];
+  renderedSections.value = [];
+  resolvedMap.value = {};
+  historyStack.value = [];
+  activePopoverSection.value = null;
 }
 
 function skipAndOpenReader(): void {
   const identity = bookId.value;
   activeAuditReport.value = null;
   activeAuditNovel.value = null;
+  clearAuditState();
   selectBook(identity);
   emit("open-reader");
 }
@@ -895,6 +944,29 @@ watch(
               <span class="btn-text">保留独立</span>
             </button>
             <button v-else class="popover-action-btn btn-accept" @click="restore">撤销保留</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Audit Saving Fullscreen Blocking Overlay -->
+    <transition name="overlay-fade">
+      <div v-if="isSaving" class="audit-saving-overlay" role="dialog" aria-modal="true" aria-label="正在落盘保存">
+        <div class="saving-spinner-card">
+          <div class="spinner-ring"></div>
+          <h3 class="spinner-title">正在落盘保存</h3>
+          <p class="spinner-filename">《{{ bookTitle }}》</p>
+          <div class="saving-progress-container">
+            <div class="saving-progress-track">
+              <div class="saving-progress-fill" :style="{ width: `${savePercent}%` }"></div>
+            </div>
+            <div class="saving-progress-meta">
+              <span class="saving-progress-detail">{{ savePhaseText }}</span>
+              <span class="saving-progress-percent">{{ savePercent }}%</span>
+            </div>
+          </div>
+          <div class="spinner-lock-hint">
+            <span>🔒 正在安全写入物理文件，已暂停其他操作，请稍候...</span>
           </div>
         </div>
       </div>
@@ -1661,5 +1733,137 @@ watch(
 .popover-fade-enter-from,
 .popover-fade-leave-to {
   opacity: 0;
+}
+
+/* Audit Saving Fullscreen Overlay */
+.audit-saving-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 15, 29, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  pointer-events: all;
+  user-select: none;
+}
+
+.saving-spinner-card {
+  background: #1e293b;
+  border: 1px solid #38bdf8;
+  border-radius: 16px;
+  padding: 36px 40px;
+  width: 480px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 35px rgba(56, 189, 248, 0.25);
+  text-align: center;
+  animation: dialogPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.saving-spinner-card .spinner-ring {
+  width: 54px;
+  height: 54px;
+  border: 4px solid rgba(56, 189, 248, 0.2);
+  border-top-color: #38bdf8;
+  border-radius: 50%;
+  animation: spin 0.85s linear infinite;
+  margin-bottom: 20px;
+}
+
+.saving-spinner-card .spinner-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-bottom: 6px;
+}
+
+.saving-spinner-card .spinner-filename {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-bottom: 20px;
+  word-break: break-all;
+  max-width: 100%;
+}
+
+.saving-progress-container {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.saving-progress-track {
+  width: 100%;
+  height: 8px;
+  background: #0f172a;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #334155;
+}
+
+.saving-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0284c7, #38bdf8);
+  border-radius: 4px;
+  transition: width 0.2s ease-out;
+}
+
+.saving-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.saving-progress-detail {
+  color: #cbd5e1;
+}
+
+.saving-progress-percent {
+  color: #38bdf8;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.spinner-lock-hint {
+  font-size: 12px;
+  color: #94a3b8;
+  padding: 8px 16px;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 20px;
+  border: 1px solid rgba(56, 189, 248, 0.15);
+}
+
+.overlay-fade-enter-active,
+.overlay-fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+
+.overlay-fade-enter-from,
+.overlay-fade-leave-to {
+  opacity: 0;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dialogPop {
+  0% {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 </style>
