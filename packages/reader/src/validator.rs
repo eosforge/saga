@@ -24,9 +24,9 @@ pub fn parse_chinese_numeral(s: &str) -> Option<u32> {
         return None;
     }
 
-    // 1. Direct ASCII integer parsing (e.g. "124", "001")
-    if let Ok(val) = trimmed.parse::<u32>() {
-        return Some(val);
+    // ASCII digits and Chinese positional digits have separate grammars.
+    if trimmed.bytes().all(|byte| byte.is_ascii_digit()) {
+        return trimmed.parse().ok();
     }
 
     // Overflowing ASCII values must not fall through to the Chinese parser.
@@ -38,10 +38,13 @@ pub fn parse_chinese_numeral(s: &str) -> Option<u32> {
         .chars()
         .any(|character| matches!(character, '十' | '拾' | '百' | '佰' | '千' | '仟' | '万'));
 
-    // 3. Traditional / Simplified Chinese numeral accumulation
+    // Unit notation requires descending small units and at most one ten-thousand group.
     let mut total: u64 = 0;
-    let mut current_unit: u64 = 0;
-    let mut has_digit = false;
+    let mut group: u64 = 0;
+    let mut digit: Option<u64> = None;
+    let mut previous = 10_000;
+    let mut myriad = false;
+    let mut zero = false;
 
     for c in trimmed.chars() {
         let val = match c {
@@ -55,46 +58,55 @@ pub fn parse_chinese_numeral(s: &str) -> Option<u32> {
             '七' | '柒' => 7,
             '八' | '捌' => 8,
             '九' | '玖' => 9,
-            '十' | '拾' => {
-                let unit = if current_unit == 0 { 1 } else { current_unit };
-                total = total.checked_add(unit.checked_mul(10)?)?;
-                current_unit = 0;
-                has_digit = true;
-                continue;
-            }
-            '百' | '佰' => {
-                let unit = if current_unit == 0 { 1 } else { current_unit };
-                total = total.checked_add(unit.checked_mul(100)?)?;
-                current_unit = 0;
-                has_digit = true;
-                continue;
-            }
-            '千' | '仟' => {
-                let unit = if current_unit == 0 { 1 } else { current_unit };
-                total = total.checked_add(unit.checked_mul(1000)?)?;
-                current_unit = 0;
-                has_digit = true;
-                continue;
-            }
+            '十' | '拾' => 10,
+            '百' | '佰' => 100,
+            '千' | '仟' => 1000,
             '万' => {
-                let unit = if current_unit == 0 && total == 0 { 1 } else { current_unit };
-                total = total.checked_add(unit)?.checked_mul(10000)?;
-                current_unit = 0;
-                has_digit = true;
+                if myriad || zero {
+                    return None;
+                }
+                group = group.checked_add(digit.take().unwrap_or(0))?;
+                if group == 0 {
+                    return None;
+                }
+                total = group.checked_mul(10_000)?;
+                group = 0;
+                previous = 10_000;
+                myriad = true;
                 continue;
             }
             _ => return None,
         };
-        current_unit = if positional { current_unit.checked_mul(10)?.checked_add(val)? } else { val };
-        has_digit = true;
+        if positional {
+            total = total.checked_mul(10)?.checked_add(val)?;
+        } else if val >= 10 {
+            if val >= previous {
+                return None;
+            }
+            let coefficient = match digit.take() {
+                Some(value) => value,
+                None if val == 10 && group == 0 && (!zero || myriad) => 1,
+                None => return None,
+            };
+            group = group.checked_add(coefficient.checked_mul(val)?)?;
+            previous = val;
+            zero = false;
+        } else if val == 0 {
+            if digit.is_some() || zero || (group == 0 && total == 0) {
+                return None;
+            }
+            zero = true;
+        } else {
+            if digit.replace(val).is_some() {
+                return None;
+            }
+            zero = false;
+        }
     }
-
-    total = total.checked_add(current_unit)?;
-    if has_digit {
-        u32::try_from(total).ok()
-    } else {
-        None
+    if zero {
+        return None;
     }
+    u32::try_from(total.checked_add(group)?.checked_add(digit.unwrap_or(0))?).ok()
 }
 
 /// Extracts chapter number from a chapter heading string if numbered.
@@ -234,12 +246,14 @@ pub fn validate_novel_sequence(sections: &[Section]) -> NovelValidation {
     // 2. Detect chapter numbering style (Continuous vs. Per-Volume Reset)
     let mut is_per_volume_reset = false;
     if volume_groups.len() > 1 {
-        // Inspect second volume's first numbered chapter
-        let first_vol_last_num = volume_groups[0].1.iter().filter_map(|s| extract_chapter_number(&s.title)).next_back();
-        let second_vol_first_num = volume_groups[1].1.iter().filter_map(|s| extract_chapter_number(&s.title)).next();
-
-        if let (Some(last1), Some(first2)) = (first_vol_last_num, second_vol_first_num) {
-            if first2 <= 3 && first2 < last1 {
+        // Prefaces and appendices without chapter numbers do not establish a numbering convention.
+        let mut numbered = volume_groups.iter().filter_map(|(_, sections)| {
+            let mut numbers = sections.iter().filter_map(|section| extract_chapter_number(&section.title));
+            let first = numbers.next()?;
+            Some((first, numbers.next_back().unwrap_or(first)))
+        });
+        if let (Some((_, last1)), Some((first2, _))) = (numbered.next(), numbered.next()) {
+            if first2 <= 3 && first2 <= last1 {
                 is_per_volume_reset = true;
             }
         }
@@ -367,6 +381,36 @@ pub fn validate_novel_sequence(sections: &[Section]) -> NovelValidation {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unit_notation_rejects_duplicate_and_ascending_units() {
+        for value in [
+            "十十",
+            "十百",
+            "百十",
+            "一二十",
+            "一百二三",
+            "万",
+            "一万万",
+            "一百零",
+            "一百零零一",
+            "零十",
+            "一万零万",
+            "一2三",
+        ] {
+            assert_eq!(parse_chinese_numeral(value), None, "{value}");
+        }
+        for (value, expected) in [
+            ("零", 0),
+            ("一万零十", 10_010),
+            ("壹仟贰佰叁拾肆", 1234),
+            ("九千九百九十九万九千九百九十九", 99_999_999),
+            ("四二九四九六七二九五", u32::MAX),
+        ] {
+            assert_eq!(parse_chinese_numeral(value), Some(expected), "{value}");
+        }
+        assert_eq!(parse_chinese_numeral("四二九四九六七二九六"), None);
+    }
 
     #[test]
     fn test_chinese_numeral_parsing() {

@@ -152,3 +152,28 @@ test("selecting chapters updates reading progress percentage and lastRead status
   assert.equal(book.currentChapterIndex, total - 1);
   assert.equal(book.progress, 100);
 });
+
+test("loadStoredNovels restores saved chapter, paragraph, and progress percentage", async () => {
+  const summaries = [{
+    id: "sample-book",
+    title: "示例书名",
+    author: "作者",
+    description: "简介",
+    chapters: 100,
+    format: "SAGA",
+    first_chapter: "第一章",
+    last_chapter_index: 49,
+    last_paragraph_index: 8,
+    last_scroll_ratio: 0.35
+  }];
+  const store = loader({ invoke: async (cmd) => cmd === "load_book_summaries" ? summaries : undefined })("stores/library.ts");
+  await store.loadStoredNovels();
+
+  assert.equal(store.books.value.length, 1);
+  const book = store.books.value[0];
+  assert.equal(book.currentChapterIndex, 49);
+  assert.equal(book.currentParagraphIndex, 8);
+  assert.equal(book.currentScrollRatio, 0.35);
+  assert.equal(book.progress, 50);
+  assert.equal(book.lastRead, "最近阅读");
+});

@@ -9,10 +9,10 @@ export interface Paragraph {
   chunks: { id: string; index: number; text: string }[];
 }
 
-/** Split punctuation-delimited sentences, retaining closing quotes and punctuation. */
+/** Match reader::split_sentences: Chinese terminals retain trailing closing quotes. */
 export function sentences(body: string): string[] {
   return body.split(/\r?\n/).flatMap((line) => {
-    return (line.trim().match(/[^。！？；!?]+[。！？；!?]*["'”’）)』」]*|[。！？；!?]+/gu) || [])
+    return (line.trim().match(/[^。！？；]*[。！？；]["'”’）)』」]*|[^。！？；]+$/gu) || [])
       .map((part) => part.trim()).filter(Boolean);
   });
 }

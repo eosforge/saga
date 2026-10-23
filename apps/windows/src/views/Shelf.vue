@@ -191,8 +191,7 @@ async function processImportedFile(file: File): Promise<void> {
   const dotIndex = fileName.lastIndexOf(".");
   const title = dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
   const ext = dotIndex > 0 ? fileName.substring(dotIndex + 1).toUpperCase() : "TXT";
-  if (ext !== "TXT" && ext !== "SAGA") { showToast("目前仅支持 TXT 与 .saga 文件"); return; }
-  const format = ext === "SAGA" ? "SAGA" : "TXT";
+  if (ext !== "TXT") { showToast("浏览器临时预览仅支持 TXT；请在桌面端导入 .saga 文件"); return; }
 
   try {
     isImporting.value = true;
@@ -208,7 +207,7 @@ async function processImportedFile(file: File): Promise<void> {
     importPhaseTitle.value = "正在解析";
     importDetailText.value = "正在切片章节与段落...";
 
-    importBook(title, "本地导入", format, text);
+    importBook(title, "本地导入", "TXT", text);
     importPercent.value = 100;
     showToast(`《${title}》已导入浏览器内存`);
     isImporting.value = false;
@@ -298,7 +297,7 @@ onUnmounted(() => {
     <input
       ref="fileInputRef"
       type="file"
-      accept=".txt,.saga"
+      :accept="isTauri() ? '.txt,.saga' : '.txt'"
       class="hidden-file-input"
       @change="handleFileSelected"
     />

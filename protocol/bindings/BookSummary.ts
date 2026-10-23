@@ -31,4 +31,16 @@ format: string,
 /**
  * Preview or title of the first section.
  */
-first_chapter: string, };
+first_chapter: string, 
+/**
+ * Last read zero-based chapter index.
+ */
+last_chapter_index: number, 
+/**
+ * Last read paragraph index within chapter.
+ */
+last_paragraph_index: number, 
+/**
+ * Last scroll ratio within chapter (0.0 to 1.0).
+ */
+last_scroll_ratio: number, };

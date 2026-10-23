@@ -11,6 +11,8 @@ import {
   nextSentence,
   setBookChapter,
   ensureBookLoaded,
+  saveReadingProgress,
+  flushReadingProgress,
   failure
 } from "../stores/library";
 import { contents, paragraphs as getChapterParagraphs } from "../text";
@@ -22,6 +24,8 @@ const emit = defineEmits<{
 
 const readerViewportRef = ref<HTMLElement | null>(null);
 let disposed = false;
+let generation = 0;
+let jumping: ReturnType<typeof setTimeout> | null = null;
 const fontSize = ref(20);
 const isTocVisible = ref(true);
 const tocSearchQuery = ref("");
@@ -50,13 +54,49 @@ const isAppending = ref(false);
 const isPrepending = ref(false);
 const isJumping = ref(false);
 
-function scrollToTop(): void {
-  if (readerViewportRef.value) {
-    readerViewportRef.value.scrollTop = 0;
+function restoreReadingPosition(): void {
+  const el = readerViewportRef.value;
+  if (!el || !activeBook.value) return;
+
+  const targetParaIndex = activeBook.value.currentParagraphIndex ?? 0;
+  const targetScrollRatio = activeBook.value.currentScrollRatio ?? 0;
+
+  if (targetParaIndex > 0) {
+    const activeChapterBlock = el.querySelector<HTMLElement>(
+      `.chapter-article-block[data-chapter-index="${activeBook.value.currentChapterIndex}"]`
+    );
+    if (activeChapterBlock) {
+      const paraElements = activeChapterBlock.querySelectorAll<HTMLElement>(".reader-para");
+      const targetPara = paraElements[targetParaIndex] || paraElements[paraElements.length - 1];
+      if (targetPara) {
+        targetPara.scrollIntoView({ block: "start", behavior: "auto" });
+        return;
+      }
+    }
   }
+
+  if (targetScrollRatio > 0) {
+    const activeChapterBlock = el.querySelector<HTMLElement>(
+      `.chapter-article-block[data-chapter-index="${activeBook.value.currentChapterIndex}"]`
+    );
+    if (activeChapterBlock) {
+      const blockTop = activeChapterBlock.offsetTop;
+      const blockHeight = activeChapterBlock.offsetHeight;
+      el.scrollTop = blockTop + Math.round(blockHeight * targetScrollRatio);
+      return;
+    }
+  }
+
+  el.scrollTop = 0;
 }
 
 function initRenderedChapters(): void {
+  const token = ++generation;
+  if (jumping !== null) clearTimeout(jumping);
+  jumping = null;
+  isJumping.value = false;
+  isAppending.value = false;
+  isPrepending.value = false;
   if (!activeBook.value || !activeBook.value.sections || activeBook.value.sections.length === 0) {
     renderedChapters.value = [];
     return;
@@ -65,6 +105,8 @@ function initRenderedChapters(): void {
   const initialSec = activeBook.value.sections[curIdx] || activeBook.value.sections[0];
   renderedChapters.value = [initialSec];
   nextTick(() => {
+    if (disposed || generation !== token) return;
+    restoreReadingPosition();
     const activeTocRow = document.querySelector<HTMLElement>(".chapter-row.active");
     if (activeTocRow) {
       activeTocRow.scrollIntoView({ block: "nearest" });
@@ -75,13 +117,11 @@ function initRenderedChapters(): void {
 watch(
   () => activeBook.value?.id,
   async (newId) => {
+    ++generation;
     if (newId) {
       try { await ensureBookLoaded(newId); } catch { return; }
       if (disposed || activeBook.value?.id !== newId) return;
       initRenderedChapters();
-      nextTick(() => {
-        scrollToTop();
-      });
     }
   }
 );
@@ -102,16 +142,26 @@ function isVolumeExpanded(volumeName: string): boolean {
 }
 
 async function onSelectChapter(index: number): Promise<void> {
-  if (!activeBook.value?.sections) return;
-  const sections = activeBook.value.sections;
+  const book = activeBook.value;
+  if (disposed || !book?.sections) return;
+  const sections = book.sections;
   if (!sections[index]) return;
 
+  const token = ++generation;
+  if (jumping !== null) clearTimeout(jumping);
+  jumping = null;
+  isAppending.value = false;
+  isPrepending.value = false;
   isJumping.value = true;
-  await setBookChapter(activeBook.value.id, index);
+  try { await setBookChapter(book.id, index); }
+  catch { if (generation === token) isJumping.value = false; return; }
+  if (disposed || generation !== token || activeBook.value !== book) return;
+  saveReadingProgress(book.id, index, 0, 0);
 
   // Directly render the target chapter at scrollTop = 0 to guarantee exact chapter display
   renderedChapters.value = [sections[index]];
   nextTick(() => {
+    if (disposed || generation !== token || activeBook.value !== book) return;
     const el = readerViewportRef.value;
     if (el) {
       el.scrollTop = 0;
@@ -120,8 +170,9 @@ async function onSelectChapter(index: number): Promise<void> {
     if (activeTocRow) {
       activeTocRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
-    setTimeout(() => {
-      isJumping.value = false;
+    jumping = setTimeout(() => {
+      jumping = null;
+      if (!disposed && generation === token) isJumping.value = false;
     }, 50);
   });
 }
@@ -143,7 +194,8 @@ async function handleNextChapter(): Promise<void> {
 }
 
 function appendNextChapter(): void {
-  if (!activeBook.value?.sections) return;
+  if (disposed || isAppending.value || isPrepending.value || !activeBook.value?.sections) return;
+  const token = generation;
   const sections = activeBook.value.sections;
   if (renderedChapters.value.length === 0) return;
 
@@ -153,14 +205,17 @@ function appendNextChapter(): void {
     isAppending.value = true;
     renderedChapters.value.push(sections[nextIdx]);
     nextTick(() => {
+      if (disposed || generation !== token) return;
       isAppending.value = false;
+      trim();
     });
   }
 }
 
 function prependPrevChapter(): void {
   const el = readerViewportRef.value;
-  if (!el || !activeBook.value?.sections || renderedChapters.value.length === 0 || isPrepending.value) return;
+  if (disposed || !el || !activeBook.value?.sections || renderedChapters.value.length === 0 || isPrepending.value || isAppending.value) return;
+  const token = generation;
 
   const firstRendered = renderedChapters.value[0];
   const prevIdx = firstRendered.index - 1;
@@ -172,42 +227,87 @@ function prependPrevChapter(): void {
     renderedChapters.value.unshift(activeBook.value.sections[prevIdx]);
 
     nextTick(() => {
+      if (disposed || generation !== token) return;
       const newScrollHeight = el.scrollHeight;
       const heightDiff = newScrollHeight - oldScrollHeight;
       el.scrollTop = oldScrollTop + heightDiff;
       isPrepending.value = false;
+      trim();
     });
   }
 }
 
-function updateCurrentChapterFromScroll(): void {
+/** Release chapters beyond the viewport buffer while retaining the visible scroll anchor. */
+function trim(): void {
+  const viewport = readerViewportRef.value;
+  if (!viewport || renderedChapters.value.length <= 5 || isAppending.value || isPrepending.value) return;
+  const blocks = Array.from(viewport.querySelectorAll<HTMLElement>(".chapter-article-block"));
+  if (blocks.length !== renderedChapters.value.length) return;
+  const bounds = viewport.getBoundingClientRect();
+  let first = 0;
+  let end = blocks.length;
+  while (end - first > 5 && blocks[first].getBoundingClientRect().bottom < bounds.top - 700) first++;
+  while (end - first > 5 && blocks[end - 1].getBoundingClientRect().top > bounds.bottom + 700) end--;
+  if (first === 0 && end === blocks.length) return;
+  const anchor = blocks[first];
+  const offset = anchor.getBoundingClientRect().top;
+  const token = generation;
+  isPrepending.value = true;
+  renderedChapters.value = renderedChapters.value.slice(first, end);
+  nextTick(() => {
+    if (disposed || generation !== token) return;
+    viewport.scrollTop += anchor.getBoundingClientRect().top - offset;
+    isPrepending.value = false;
+  });
+}
+
+function updateReadingPositionFromScroll(): void {
   const el = readerViewportRef.value;
-  if (!el || !activeBook.value?.sections) return;
+  if (!el || !activeBook.value?.sections || isJumping.value) return;
 
   const chapterBlocks = el.querySelectorAll<HTMLElement>(".chapter-article-block");
   if (!chapterBlocks || chapterBlocks.length === 0) return;
 
   const containerRect = el.getBoundingClientRect();
-  let currentSecIdx: number | null = null;
+  const detectionLine = containerRect.top + 100;
 
   for (const block of Array.from(chapterBlocks)) {
-    const rect = block.getBoundingClientRect();
-    if (rect.top <= containerRect.top + 200 && rect.bottom >= containerRect.top + 60) {
+    const blockRect = block.getBoundingClientRect();
+    if (blockRect.top <= detectionLine && blockRect.bottom >= detectionLine) {
       const idx = block.dataset.chapterIndex;
-      if (idx !== undefined) {
-        currentSecIdx = parseInt(idx, 10);
+      if (idx === undefined) break;
+      const chapterIdx = parseInt(idx, 10);
+
+      const paragraphs = block.querySelectorAll<HTMLElement>(".reader-para");
+      let visibleParaIdx = 0;
+      for (let p = 0; p < paragraphs.length; p++) {
+        const pRect = paragraphs[p].getBoundingClientRect();
+        if (pRect.bottom >= detectionLine) {
+          visibleParaIdx = p;
+          break;
+        }
+      }
+
+      const blockHeight = blockRect.height || 1;
+      const blockOffset = Math.max(0, detectionLine - blockRect.top);
+      const scrollRatio = Math.min(1.0, Math.max(0.0, blockOffset / blockHeight));
+
+      saveReadingProgress(activeBook.value.id, chapterIdx, visibleParaIdx, scrollRatio);
+
+      if (activeBook.value.currentChapterIndex !== chapterIdx) {
+        activeBook.value.currentChapterIndex = chapterIdx;
+        const sec = activeBook.value.sections[chapterIdx];
+        if (sec) {
+          activeBook.value.currentChapter = sec.title;
+        }
       }
       break;
     }
   }
-
-  if (currentSecIdx !== null && activeBook.value.currentChapterIndex !== currentSecIdx) {
-    void setBookChapter(activeBook.value.id, currentSecIdx);
-  }
 }
 
 function handleViewportScroll(): void {
-  if (isJumping.value) return;
+  if (disposed || isJumping.value || isAppending.value || isPrepending.value) return;
   const el = readerViewportRef.value;
   if (!el || !activeBook.value?.sections) return;
 
@@ -222,8 +322,9 @@ function handleViewportScroll(): void {
     prependPrevChapter();
   }
 
-  // 3. Scroll spy to sync active chapter with TOC
-  updateCurrentChapterFromScroll();
+  // 3. Scroll spy to sync active chapter & paragraph position
+  updateReadingPositionFromScroll();
+  trim();
 }
 
 const isBookFinished = computed(() => {
@@ -299,6 +400,13 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 }
 
+async function handleBackToShelf(): Promise<void> {
+  try {
+    await flushReadingProgress();
+    if (!disposed) emit("back-to-shelf");
+  } catch { /* The shared banner keeps the failed position observable and retryable. */ }
+}
+
 onMounted(async () => {
   window.addEventListener("keydown", handleKeydown);
   window.addEventListener("pointerdown", dismiss);
@@ -306,12 +414,15 @@ onMounted(async () => {
     try { await ensureBookLoaded(activeBook.value.id); } catch { return; }
     if (disposed) return;
     initRenderedChapters();
-    scrollToTop();
   }
 });
 
 onUnmounted(() => {
   disposed = true;
+  ++generation;
+  if (jumping !== null) clearTimeout(jumping);
+  jumping = null;
+  void flushReadingProgress().catch(() => { });
   window.removeEventListener("keydown", handleKeydown);
   window.removeEventListener("pointerdown", dismiss);
 });
@@ -323,7 +434,7 @@ onUnmounted(() => {
       <div class="empty-icon-wrap">📖</div>
       <h2 class="empty-reader-title">当前未打开任何书籍</h2>
       <p class="empty-reader-desc">书架中尚未选择书籍，或当前书籍已被删除。</p>
-      <button class="back-shelf-btn-primary" @click="emit('back-to-shelf')">
+      <button class="back-shelf-btn-primary" @click="handleBackToShelf">
         ← 返回书架选择书籍
       </button>
     </div>
@@ -333,7 +444,7 @@ onUnmounted(() => {
     <p v-if="failure" role="alert">{{ failure }}</p>
     <!-- Header Toolbar -->
     <header class="reader-header">
-      <button class="toolbar-button" aria-label="返回书架" title="返回书架" @click="emit('back-to-shelf')">
+      <button class="toolbar-button" aria-label="返回书架" title="返回书架" @click="handleBackToShelf">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6M8 12h12" /></svg>
       </button>
       <button
@@ -447,6 +558,7 @@ onUnmounted(() => {
                 v-for="para in getChapterParagraphs(chapter)"
                 :key="para.pIndex"
                 class="reader-para"
+                :data-para-index="para.pIndex"
               >
                 <span
                   v-for="chunk in para.chunks"

@@ -2,6 +2,8 @@
 
 mod ingestion;
 mod paths;
+#[cfg(test)]
+mod regression;
 mod review;
 mod storage;
 
@@ -96,9 +98,7 @@ fn ingest(app: &tauri::AppHandle, path_str: String) -> Result<NovelImportResult,
     report("persisting", "正在打包 .saga 归档并持久化...", 75);
     let books_dir = paths::directory(app, "books")?;
     let conn = storage::open(&paths::directory(app, "storage")?.join("saga.db"))?;
-    storage::save(&conn, &novel, "TXT", &books_dir)?;
-    report("validating", "正在检查卷章顺序与核验规则...", 90);
-    let validation = review::inspect(&conn, &book_id, &novel.sections)?;
+    let validation = storage::save(&conn, &novel, "TXT", &books_dir)?;
     report("completed", "导入完成，正在进入...", 100);
 
     Ok(NovelImportResult { novel, validation })
@@ -151,13 +151,11 @@ async fn import_txt_bytes(app: tauri::AppHandle, bytes: Vec<u8>, title: Option<S
     }
 
     tokio::task::spawn_blocking(move || {
-        let book_id = protocol::hash(&bytes);
         let books_dir = paths::directory(&app, "books")?;
 
         let novel = reader::parse_txt(&bytes, title.as_deref()).map_err(|e| e.to_string())?;
         let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::save(&conn, &novel, "TXT", &books_dir)?;
-        let validation = review::inspect(&conn, &book_id, &novel.sections)?;
+        let validation = storage::save(&conn, &novel, "TXT", &books_dir)?;
 
         Ok(NovelImportResult { novel, validation })
     })
@@ -238,6 +236,16 @@ async fn update_novel_sections(
 }
 
 #[tauri::command]
+async fn update_reading_progress(app: tauri::AppHandle, book_id: String, chapter_index: u32, paragraph_index: u32, scroll_ratio: f64) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
+        storage::update_progress(&conn, &book_id, chapter_index, paragraph_index, scroll_ratio)
+    })
+    .await
+    .map_err(|e| format!("后台更新阅读进度失败: {}", e))?
+}
+
+#[tauri::command]
 async fn export_novel_saga(app: tauri::AppHandle, book_id: String, output_path: String) -> Result<(), String> {
     tokio::task::spawn_blocking(move || {
         let books_dir = paths::directory(&app, "books")?;
@@ -270,6 +278,7 @@ pub fn run() {
             load_book_summaries,
             load_novel,
             load_novels,
+            update_reading_progress,
             export_novel_saga
         ])
         .run(tauri::generate_context!())

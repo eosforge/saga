@@ -12,9 +12,9 @@ import type { NovelValidation } from "../../../../protocol/bindings/NovelValidat
 export interface BookItem extends Book {
   /** Stored format label; TXT or native SAGA package. */
   format: "TXT" | "SAGA";
-  /** Reserved percentage; durable reading progress is not implemented. */
+  /** Reading progress percentage (0 - 100). */
   progress: number;
-  /** Session provenance label, not a durable read timestamp. */
+  /** Session provenance label or last read status. */
   lastRead: string;
   /** Decorative cover background. */
   coverGradient: string;
@@ -22,6 +22,10 @@ export interface BookItem extends Book {
   currentChapter: string;
   /** Zero-based section position. */
   currentChapterIndex: number;
+  /** Zero-based paragraph position within chapter. */
+  currentParagraphIndex?: number;
+  /** Scroll ratio within chapter (0.0 to 1.0). */
+  currentScrollRatio?: number;
   /** Loaded source graph; undefined until hydration completes. */
   sections?: Section[];
   /** Loaded audio bytes; current TXT imports have none. Filenames do not establish availability. */
@@ -69,7 +73,16 @@ export const activeParagraphs = computed(() => activeSection.value ? paragraphs(
 
 // Object identity prevents late hydration from replacing a reimported book.
 const loading = new Map<BookItem, Promise<void>>();
+// Successful mutations invalidate earlier hydration and catalog responses for the same identity.
+const versions = new Map<string, number>();
+const deleting = new Set<string>();
+let revision = 0;
 let playTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Record one successfully published catalog mutation. */
+function revise(id: string): void {
+  versions.set(id, ++revision);
+}
 
 // Resource removal must also stop an already running session timer.
 watch(hasAudio, available => { if (!available) pause(); }, { flush: "sync" });
@@ -118,20 +131,32 @@ export function prevSentence(): void {
   activeSentenceIndex.value = Math.max(0, activeSentenceIndex.value - 1);
 }
 
-/** Refresh dependent reading state after hydration or a committed edit. */
+/** Keep the existing chapter-based shelf percentage in one place. */
+function percentage(index: number, total: number): number {
+  if (total <= 1 || index <= 0) return 0;
+  if (index >= total - 1) return 100;
+  return Math.min(99, Math.max(1, Math.round(((index + 1) / total) * 100)));
+}
+
+/** Refresh derived text and clamp a saved anchor after hydration or a committed edit. */
 function project(book: BookItem, index: number): void {
   const sections = book.sections || [];
-  book.currentChapterIndex = Math.max(0, Math.min(index, sections.length - 1));
+  const previous = book.currentChapterIndex;
+  book.currentChapterIndex = Math.max(0, Math.min(Number.isInteger(index) ? index : 0, sections.length - 1));
   const section = sections[book.currentChapterIndex];
   book.currentChapter = section?.title || "";
   book.sentences = section ? contents(section) : [];
   const total = sections.length || book.chapters || 0;
-  book.progress = total <= 1 || book.currentChapterIndex <= 0
-    ? 0
-    : book.currentChapterIndex >= total - 1
-      ? 100
-      : Math.min(99, Math.max(1, Math.round(((book.currentChapterIndex + 1) / total) * 100)));
-  if (book.currentChapterIndex > 0) {
+  book.progress = percentage(book.currentChapterIndex, total);
+  const count = section ? paragraphs(section).length : 0;
+  const paragraph = book.currentParagraphIndex ?? 0;
+  const position = previous === book.currentChapterIndex && Number.isInteger(paragraph)
+    ? Math.max(0, Math.min(paragraph, count - 1)) : 0;
+  const ratio = book.currentScrollRatio ?? 0;
+  book.currentParagraphIndex = position;
+  book.currentScrollRatio = previous === book.currentChapterIndex && position === paragraph && Number.isFinite(ratio)
+    ? Math.max(0, Math.min(1, ratio)) : 0;
+  if (book.currentChapterIndex > 0 || position > 0) {
     book.lastRead = "最近阅读";
   }
   if (activeBookId.value === book.id) {
@@ -167,20 +192,32 @@ export function prevChapter(): void {
 /** Publish a persisted native import or an explicitly transient preview. */
 export function importNovel(novel: Novel, format: "TXT" | "SAGA" = "TXT"): BookItem {
   pause();
+  const previous = books.value.find(item => item.id === novel.book.id);
   const book: BookItem = {
     ...novel.book, format, progress: 0, lastRead: isTauri() ? "本地导入" : "浏览器临时预览",
     coverGradient: "linear-gradient(135deg, #1e3a8a 0%, #312e81 100%)",
-    currentChapter: "", currentChapterIndex: 0, sections: markRaw(novel.sections), sentences: []
+    currentChapter: "", currentChapterIndex: previous?.currentChapterIndex ?? 0,
+    currentParagraphIndex: previous?.currentParagraphIndex ?? 0,
+    currentScrollRatio: previous?.currentScrollRatio ?? 0,
+    sections: markRaw(novel.sections), sentences: []
   };
-  project(book, 0);
+  project(book, book.currentChapterIndex);
+  revise(book.id);
   books.value = [book, ...books.value.filter((item) => item.id !== book.id)];
   activeBookId.value = book.id;
   activeSentenceIndex.value = 0;
+  if (pendingProgress.has(book.id) || writing?.bookId === book.id) {
+    pendingProgress.set(book.id, {
+      bookId: book.id, chapterIndex: book.currentChapterIndex,
+      paragraphIndex: book.currentParagraphIndex ?? 0, scrollRatio: book.currentScrollRatio ?? 0
+    });
+  }
   return book;
 }
 
 /** Preview the entire browser TXT as one section, without native parsing or persistence. */
 export function importBook(title: string, author: string, format: "TXT" | "SAGA" = "TXT", body = ""): void {
+  if (format !== "TXT") throw new Error("浏览器临时预览仅支持 TXT；请在桌面端导入 .saga 文件");
   const id = crypto.randomUUID();
   importNovel({
     book: { id, title, author: author || "未知作者", description: "", chapters: 1 },
@@ -190,16 +227,26 @@ export function importBook(title: string, author: string, format: "TXT" | "SAGA"
 
 /** Delete storage before removing catalog state; rejection preserves the shelf. */
 export async function deleteBook(id: string): Promise<void> {
-  if (isTauri()) await invoke("delete_novel", { id });
-  books.value = books.value.filter((book) => book.id !== id);
-  if (activeBookId.value === id) {
-    pause();
-    activeBookId.value = books.value[0]?.id || "";
-    activeSentenceIndex.value = 0;
-  }
-  if (activeAuditNovel.value?.book.id === id) {
-    activeAuditNovel.value = null;
-    activeAuditReport.value = null;
+  if (deleting.has(id)) return;
+  deleting.add(id);
+  try {
+    // Finish an already issued write before deletion; retain queued progress if deletion is rejected.
+    if (progressWrite) await progressWrite.catch(() => { });
+    if (isTauri()) await invoke("delete_novel", { id });
+    pendingProgress.delete(id);
+    revise(id);
+    books.value = books.value.filter((book) => book.id !== id);
+    if (activeBookId.value === id) {
+      pause();
+      activeBookId.value = books.value[0]?.id || "";
+      activeSentenceIndex.value = 0;
+    }
+    if (activeAuditNovel.value?.book.id === id) {
+      activeAuditNovel.value = null;
+      activeAuditReport.value = null;
+    }
+  } finally {
+    deleting.delete(id);
   }
 }
 
@@ -209,16 +256,18 @@ export async function ensureBookLoaded(bookId: string): Promise<void> {
   if (!target || target.sections !== undefined || !isTauri()) return;
   const pending = loading.get(target);
   if (pending) return pending;
+  const version = versions.get(bookId);
   const operation = (async () => {
     try {
       const novel = await invoke<Novel | null>("load_novel", { id: bookId });
-      if (!books.value.includes(target)) return;
+      if (!books.value.includes(target) || versions.get(bookId) !== version || target.sections !== undefined) return;
       if (!novel) throw new Error("书籍已不存在，请重新导入");
       target.sections = markRaw(novel.sections);
       target.chapters = novel.sections.length;
       project(target, target.currentChapterIndex);
-      failure.value = "";
+      if (failure.value.startsWith("加载书籍失败：")) failure.value = "";
     } catch (error) {
+      if (!books.value.includes(target) || versions.get(bookId) !== version) return;
       failure.value = "加载书籍失败：" + error;
       throw error;
     } finally {
@@ -231,11 +280,15 @@ export async function ensureBookLoaded(bookId: string): Promise<void> {
 
 /** Publish audited sections after native text and retention decisions commit. */
 export async function saveAuditedSections(bookId: string, sections: Section[], retained: string[]): Promise<NovelValidation> {
-  const report = await invoke<NovelValidation>("update_novel_sections", { bookId, sections, retained });
   const target = books.value.find((book) => book.id === bookId);
-  if (target) {
-    target.sections = markRaw(sections);
-    target.chapters = sections.length;
+  const version = versions.get(bookId);
+  const snapshot = sections.map(section => ({ ...section, chunks: section.chunks.map(chunk => ({ ...chunk })) }));
+  if (progressWrite || pendingProgress.size > 0) await flushReadingProgress();
+  const report = await invoke<NovelValidation>("update_novel_sections", { bookId, sections: snapshot, retained: [...retained] });
+  if (target && books.value.includes(target) && versions.get(bookId) === version) {
+    revise(bookId);
+    target.sections = markRaw(snapshot);
+    target.chapters = snapshot.length;
     project(target, target.currentChapterIndex);
   }
   return report;
@@ -244,26 +297,129 @@ export async function saveAuditedSections(bookId: string, sections: Section[], r
 /** Merge persisted summaries; full bodies load only when selected. */
 export async function loadStoredNovels(): Promise<void> {
   if (!isTauri()) return;
+  const started = revision;
   try {
     const summaries = await invoke<BookSummary[]>("load_book_summaries");
     for (const summary of summaries) {
-      if (books.value.some((book) => book.id === summary.id)) continue;
+      if ((versions.get(summary.id) ?? 0) > started || books.value.some((book) => book.id === summary.id)) continue;
+      const total = summary.chapters || 0;
+      const curIdx = Math.max(0, Math.min(summary.last_chapter_index || 0, total - 1));
       books.value.push({
-        id: summary.id, title: summary.title, author: summary.author, description: summary.description,
-        chapters: summary.chapters, format: summary.format === "SAGA" ? "SAGA" : "TXT", progress: 0,
-        lastRead: "本地数据库", coverGradient: "linear-gradient(135deg, #1e3a8a 0%, #312e81 100%)",
-        currentChapter: summary.first_chapter || "正文", currentChapterIndex: 0, sentences: []
+        id: summary.id,
+        title: summary.title,
+        author: summary.author,
+        description: summary.description,
+        chapters: summary.chapters,
+        format: summary.format === "SAGA" ? "SAGA" : "TXT",
+        progress: percentage(curIdx, total),
+        lastRead: curIdx > 0 || (summary.last_paragraph_index || 0) > 0 ? "最近阅读" : "本地数据库",
+        coverGradient: "linear-gradient(135deg, #1e3a8a 0%, #312e81 100%)",
+        currentChapter: summary.first_chapter || "正文",
+        currentChapterIndex: curIdx,
+        currentParagraphIndex: summary.last_paragraph_index || 0,
+        currentScrollRatio: summary.last_scroll_ratio || 0,
+        sentences: []
       });
     }
     if (!activeBookId.value) activeBookId.value = books.value[0]?.id || "";
-    failure.value = "";
+    if (failure.value.startsWith("读取书架失败：")) failure.value = "";
 
     const recent = books.value[0];
     if (recent && recent.sections === undefined) {
-      setTimeout(() => { void ensureBookLoaded(recent.id).catch(() => { }); }, 50);
+      if (typeof setTimeout !== "undefined") {
+        setTimeout(() => { void ensureBookLoaded(recent.id).catch(() => { }); }, 50);
+      }
     }
   } catch (error) {
     failure.value = "读取书架失败：" + error;
     throw error;
+  }
+}
+
+let progressSaveTimer: ReturnType<typeof setTimeout> | null = null;
+/** Latest unsaved anchor for one book; ratios are finite and within [0, 1]. */
+interface Position {
+  bookId: string;
+  chapterIndex: number;
+  paragraphIndex: number;
+  scrollRatio: number;
+}
+const pendingProgress = new Map<string, Position>();
+let progressWrite: Promise<void> | null = null;
+let writing: Position | null = null;
+
+/** Drain queued positions in order, sharing the active write and retaining failed positions for retry. */
+export async function flushReadingProgress(): Promise<void> {
+  if (progressSaveTimer !== null) {
+    clearTimeout(progressSaveTimer);
+    progressSaveTimer = null;
+  }
+  if (!isTauri()) return;
+  if (progressWrite) {
+    await progressWrite;
+    if (pendingProgress.size > 0) await flushReadingProgress();
+    return;
+  }
+  if (pendingProgress.size === 0) return;
+  const operation = (async () => {
+    while (pendingProgress.size > 0) {
+      const payload = [...pendingProgress.values()].find(position => !deleting.has(position.bookId));
+      if (!payload) break;
+      pendingProgress.delete(payload.bookId);
+      writing = payload;
+      try {
+        await invoke("update_reading_progress", { ...payload });
+        if (failure.value.startsWith("保存阅读进度失败：")) failure.value = "";
+      } catch (error) {
+        if (books.value.some(book => book.id === payload.bookId) && !pendingProgress.has(payload.bookId)) {
+          pendingProgress.set(payload.bookId, payload);
+        }
+        failure.value = "保存阅读进度失败：" + error + "；位置仍保留在当前会话，可再次尝试保存";
+        throw error;
+      } finally {
+        writing = null;
+      }
+    }
+  })();
+  progressWrite = operation;
+  try { await operation; }
+  finally {
+    if (progressWrite === operation) progressWrite = null;
+  }
+}
+
+/** Updates in-memory position and debounces persistent write to SQLite. */
+export function saveReadingProgress(
+  bookId: string,
+  chapterIndex: number,
+  paragraphIndex: number,
+  scrollRatio: number
+): void {
+  const target = books.value.find((b) => b.id === bookId);
+  const total = target?.sections?.length ?? target?.chapters ?? 0;
+  if (!target || deleting.has(bookId) || !Number.isInteger(chapterIndex) || chapterIndex < 0 || chapterIndex >= Math.max(1, total)
+    || !Number.isInteger(paragraphIndex) || paragraphIndex < 0 || !Number.isFinite(scrollRatio) || scrollRatio < 0 || scrollRatio > 1) return;
+  if (target.currentChapterIndex !== chapterIndex) project(target, chapterIndex);
+  target.currentParagraphIndex = paragraphIndex;
+  target.currentScrollRatio = scrollRatio;
+  target.progress = percentage(chapterIndex, total);
+  if (chapterIndex > 0 || paragraphIndex > 0) {
+    target.lastRead = "最近阅读";
+  }
+  const sec = target.sections?.[chapterIndex];
+  if (sec) {
+    target.currentChapter = sec.title;
+  }
+  if (!isTauri()) return;
+  pendingProgress.set(bookId, { bookId, chapterIndex, paragraphIndex, scrollRatio });
+  if (typeof setTimeout !== "undefined") {
+    if (progressSaveTimer !== null) {
+      clearTimeout(progressSaveTimer);
+    }
+    progressSaveTimer = setTimeout(() => {
+      void flushReadingProgress().catch(() => { });
+    }, 300);
+  } else {
+    void flushReadingProgress().catch(() => { });
   }
 }

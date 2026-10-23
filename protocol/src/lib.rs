@@ -40,7 +40,7 @@ pub struct Book {
 }
 
 /// Lightweight book summary entity for high-speed shelf catalog hydration.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct BookSummary {
     /// Cryptographic content identifier of the primary book asset.
@@ -63,6 +63,15 @@ pub struct BookSummary {
 
     /// Preview or title of the first section.
     pub first_chapter: String,
+
+    /// Last read zero-based chapter index.
+    pub last_chapter_index: u32,
+
+    /// Last read paragraph index within chapter.
+    pub last_paragraph_index: u32,
+
+    /// Last scroll ratio within chapter (0.0 to 1.0).
+    pub last_scroll_ratio: f64,
 }
 
 /// Structural chapter segment within a digital publication.

@@ -47,8 +47,51 @@ pub struct PackageSection {
 }
 
 impl PackageManifest {
-    /// Encodes the complete package manifest into the canonical binary `SGMF` format.
-    pub fn encode(&self) -> Vec<u8> {
+    /// Encodes a v1 manifest, rejecting values that its fixed-width fields cannot represent.
+    pub fn encode(&self) -> Result<Vec<u8>, ProtocolError> {
+        let invalid = |message: &str| ProtocolError::Serialization(message.into());
+        if self.sections.len() > u32::MAX as usize || self.volumes.len() > u16::MAX as usize || self.chunks_count > u16::MAX as u32 + 1 {
+            return Err(invalid("manifest table count exceeds the v1 field range"));
+        }
+        let mut pool_size = 0usize;
+        for value in [&self.title, &self.author, &self.description]
+            .into_iter()
+            .chain(self.volumes.iter())
+            .chain(self.sections.iter().map(|section| &section.title))
+        {
+            if value.len() > u16::MAX as usize {
+                return Err(invalid("manifest string exceeds the v1 limit of 65535 UTF-8 bytes"));
+            }
+            pool_size = pool_size
+                .checked_add(value.len())
+                .ok_or_else(|| invalid("manifest string pool size overflow"))?;
+        }
+        if pool_size > u32::MAX as usize {
+            return Err(invalid("manifest string pool exceeds the v1 offset range"));
+        }
+        let toc_size = self
+            .sections
+            .len()
+            .checked_mul(TOC_ENTRY_SIZE)
+            .ok_or_else(|| invalid("manifest TOC size overflow"))?;
+        let volumes_offset = HEADER_SIZE.checked_add(toc_size).ok_or_else(|| invalid("manifest volume offset overflow"))?;
+        if volumes_offset > u32::MAX as usize {
+            return Err(invalid("manifest volume offset exceeds the v1 field range"));
+        }
+        let volume_table_size = self.volumes.len() * 6;
+        let size = volumes_offset
+            .checked_add(volume_table_size)
+            .and_then(|size| size.checked_add(pool_size))
+            .ok_or_else(|| invalid("manifest size overflow"))?;
+        for section in &self.sections {
+            if u32::from(section.chunk_index) >= self.chunks_count
+                || (self.volumes.is_empty() && section.volume_id != 0)
+                || (!self.volumes.is_empty() && section.volume_id as usize >= self.volumes.len())
+                || section.chunk_offset.checked_add(section.byte_length).is_none()
+            {
+                return Err(invalid("manifest section references an invalid chunk, volume or byte range"));
+            }
+        }
         let mut string_pool = Vec::new();
 
         // 1. Pack global strings
@@ -80,9 +123,7 @@ impl PackageManifest {
         // 2. Prepare TOC entries and append section titles to string pool
         let sections_count = self.sections.len() as u32;
         let toc_offset = HEADER_SIZE as u64;
-        let toc_size = self.sections.len() * TOC_ENTRY_SIZE;
         let volumes_offset = (toc_offset + toc_size as u64) as u32;
-        let volume_table_size = self.volumes.len() * 6;
         let string_pool_offset = (volumes_offset as u64) + (volume_table_size as u64);
 
         let mut toc_bytes = Vec::with_capacity(toc_size);
@@ -117,7 +158,7 @@ impl PackageManifest {
         }
 
         // 3. Assemble Header (64 bytes)
-        let mut buffer = Vec::with_capacity(HEADER_SIZE + toc_size + volume_table_size + string_pool.len());
+        let mut buffer = Vec::with_capacity(size);
         buffer.extend_from_slice(&MANIFEST_MAGIC); // 0..4
         buffer.extend_from_slice(&MANIFEST_VERSION.to_le_bytes()); // 4..6
         buffer.extend_from_slice(&0u16.to_le_bytes()); // 6..8: flags
@@ -144,7 +185,7 @@ impl PackageManifest {
         buffer.extend_from_slice(&volume_bytes);
         buffer.extend_from_slice(&string_pool);
 
-        buffer
+        Ok(buffer)
     }
 
     /// Deserializes a full package manifest from bytes.
@@ -214,8 +255,14 @@ impl<'a> PackageManifestView<'a> {
         let chunks_count = u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]);
         let total_chars = u32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
         let volumes_offset = u32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]) as usize;
-        let toc_offset = u64::from_le_bytes([bytes[24], bytes[25], bytes[26], bytes[27], bytes[28], bytes[29], bytes[30], bytes[31]]) as usize;
-        let string_pool_offset = u64::from_le_bytes([bytes[32], bytes[33], bytes[34], bytes[35], bytes[36], bytes[37], bytes[38], bytes[39]]) as usize;
+        let toc_offset = usize::try_from(u64::from_le_bytes([
+            bytes[24], bytes[25], bytes[26], bytes[27], bytes[28], bytes[29], bytes[30], bytes[31],
+        ]))
+        .map_err(|_| ProtocolError::Serialization("TOC offset exceeds the address range".into()))?;
+        let string_pool_offset = usize::try_from(u64::from_le_bytes([
+            bytes[32], bytes[33], bytes[34], bytes[35], bytes[36], bytes[37], bytes[38], bytes[39],
+        ]))
+        .map_err(|_| ProtocolError::Serialization("string pool offset exceeds the address range".into()))?;
 
         let title_offset = u32::from_le_bytes([bytes[40], bytes[41], bytes[42], bytes[43]]) as usize;
         let title_len = u16::from_le_bytes([bytes[44], bytes[45]]) as usize;
@@ -227,15 +274,23 @@ impl<'a> PackageManifestView<'a> {
         let desc_offset = u32::from_le_bytes([bytes[56], bytes[57], bytes[58], bytes[59]]) as usize;
         let desc_len = u16::from_le_bytes([bytes[60], bytes[61]]) as usize;
 
-        let min_required = toc_offset + (sections_count as usize * TOC_ENTRY_SIZE);
-        if bytes.len() < min_required {
-            return Err(ProtocolError::Serialization(format!(
-                "manifest truncated: required at least {min_required} bytes, got {}",
-                bytes.len()
-            )));
+        let toc_end = (sections_count as usize)
+            .checked_mul(TOC_ENTRY_SIZE)
+            .and_then(|size| toc_offset.checked_add(size));
+        let volumes_end = volumes_offset.checked_add(volume_count as usize * 6);
+        if toc_offset < HEADER_SIZE
+            || toc_end.is_none_or(|end| end > volumes_offset)
+            || volumes_end.is_none_or(|end| end > string_pool_offset)
+            || string_pool_offset > bytes.len()
+            || chunks_count > u16::MAX as u32 + 1
+            || bytes[6..8] != [0, 0]
+            || bytes[54..56] != [0, 0]
+            || bytes[62..64] != [0, 0]
+        {
+            return Err(ProtocolError::Serialization("invalid manifest table bounds or unsupported header flags".into()));
         }
 
-        Ok(Self {
+        let view = Self {
             bytes,
             sections_count,
             chunks_count,
@@ -250,7 +305,11 @@ impl<'a> PackageManifestView<'a> {
             author_len,
             desc_offset,
             desc_len,
-        })
+        };
+        view.title()?;
+        view.author()?;
+        view.description()?;
+        Ok(view)
     }
 
     pub fn sections_count(&self) -> u32 {
@@ -282,8 +341,12 @@ impl<'a> PackageManifestView<'a> {
     }
 
     pub fn volume_at(&self, id: u16) -> Result<&'a str, ProtocolError> {
-        if id >= self.volume_count {
+        // Early v1 writers represented unnamed volumes by an empty volume table.
+        if self.volume_count == 0 && id == 0 {
             return Ok("");
+        }
+        if id >= self.volume_count {
+            return Err(ProtocolError::Serialization("volume reference exceeds the volume table".into()));
         }
         let entry_start = self.volumes_offset + (id as usize * 6);
         if entry_start + 6 > self.bytes.len() {
@@ -323,6 +386,11 @@ impl<'a> PackageManifestView<'a> {
         let audio_duration_ms = u32::from_le_bytes([entry_bytes[24], entry_bytes[25], entry_bytes[26], entry_bytes[27]]);
         let timeline_offset = u32::from_le_bytes([entry_bytes[28], entry_bytes[29], entry_bytes[30], entry_bytes[31]]);
 
+        if u32::from(chunk_index) >= self.chunks_count || flags & !SECTION_FLAG_AUDIO != 0 || chunk_offset.checked_add(byte_length).is_none() {
+            return Err(ProtocolError::Serialization("invalid section chunk reference, flags or byte range".into()));
+        }
+        self.volume_at(volume_id)?;
+
         let title = self.get_string(title_offset, title_len)?.to_string();
 
         Ok(PackageSection {
@@ -339,18 +407,89 @@ impl<'a> PackageManifestView<'a> {
     }
 
     fn get_string(&self, pool_offset: usize, length: usize) -> Result<&'a str, ProtocolError> {
-        let abs_start = self.string_pool_offset + pool_offset;
-        let abs_end = abs_start + length;
-        if abs_end > self.bytes.len() {
-            return Err(ProtocolError::Serialization("string pool reference exceeds buffer boundary".into()));
-        }
-        std::str::from_utf8(&self.bytes[abs_start..abs_end]).map_err(|e| ProtocolError::Serialization(format!("invalid utf-8 string in pool: {e}")))
+        let range = self
+            .string_pool_offset
+            .checked_add(pool_offset)
+            .and_then(|start| start.checked_add(length).map(|end| start..end))
+            .and_then(|range| self.bytes.get(range))
+            .ok_or_else(|| ProtocolError::Serialization("string pool reference exceeds buffer boundary".into()))?;
+        std::str::from_utf8(range).map_err(|e| ProtocolError::Serialization(format!("invalid utf-8 string in pool: {e}")))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sample() -> PackageManifest {
+        PackageManifest {
+            title: "Title".into(),
+            author: "Author".into(),
+            description: String::new(),
+            total_chars: 3,
+            chunks_count: 1,
+            volumes: vec!["Volume".into()],
+            sections: vec![PackageSection {
+                title: "Section".into(),
+                volume_id: 0,
+                chunk_index: 0,
+                chunk_offset: 0,
+                byte_length: 3,
+                char_count: 3,
+                has_audio: false,
+                audio_duration_ms: 0,
+                timeline_offset: 0,
+            }],
+        }
+    }
+
+    #[test]
+    fn malformed_offsets_references_and_truncation_return_errors() {
+        let original = sample().encode().unwrap();
+        for (offset, replacement) in [
+            (24, u64::MAX.to_le_bytes().to_vec()),
+            (32, u64::MAX.to_le_bytes().to_vec()),
+            (20, 0u32.to_le_bytes().to_vec()),
+            (8, u32::MAX.to_le_bytes().to_vec()),
+            (12, u32::MAX.to_le_bytes().to_vec()),
+            (40, u32::MAX.to_le_bytes().to_vec()),
+            (6, vec![1]),
+            (64, vec![1]),
+            (66, vec![2]),
+            (80, vec![1]),
+            (68, u32::MAX.to_le_bytes().to_vec()),
+        ] {
+            let mut bytes = original.clone();
+            bytes[offset..offset + replacement.len()].copy_from_slice(&replacement);
+            let decoded = std::panic::catch_unwind(|| PackageManifest::decode(&bytes));
+            assert!(matches!(decoded, Ok(Err(_))), "invalid field at byte {offset}");
+        }
+        for length in 0..original.len() {
+            assert!(PackageManifest::decode(&original[..length]).is_err(), "truncation at {length}");
+        }
+    }
+
+    #[test]
+    fn string_limits_count_utf8_bytes_without_truncation() {
+        let mut manifest = sample();
+        for text in ["a".repeat(65_535), "文".repeat(21_845)] {
+            manifest.description = text.clone();
+            assert_eq!(PackageManifest::decode(&manifest.encode().unwrap()).unwrap().description, text);
+            manifest.description.push('a');
+            assert!(manifest.encode().is_err());
+        }
+    }
+
+    #[test]
+    fn legacy_unnamed_volumes_and_empty_books_remain_supported() {
+        let mut manifest = sample();
+        manifest.volumes.clear();
+        assert_eq!(PackageManifest::decode(&manifest.encode().unwrap()).unwrap(), manifest);
+        manifest.sections.clear();
+        manifest.chunks_count = 0;
+        manifest.total_chars = 0;
+        assert_eq!(PackageManifest::decode(&manifest.encode().unwrap()).unwrap(), manifest);
+    }
 
     #[test]
     fn test_manifest_roundtrip_and_o1_lookup() {
@@ -398,7 +537,7 @@ mod tests {
             ],
         };
 
-        let encoded = manifest.encode();
+        let encoded = manifest.encode().unwrap();
         assert_eq!(&encoded[0..4], b"SGMF");
 
         // 1. Full decode test

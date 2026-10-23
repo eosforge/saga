@@ -68,9 +68,9 @@ const bookId = computed(() => {
   return activeAuditNovel.value?.book.id || activeBook.value?.id || "";
 });
 
-// Copy editable objects; immutable text is shared without serializing the full book.
+// Body text is authoritative; sentence projections are derived again after editing.
 function clone(source: Section[]): Section[] {
-  return source.map(section => ({ ...section, chunks: section.chunks.map(chunk => ({ ...chunk })) }));
+  return source.map(section => ({ ...section, chunks: [] }));
 }
 
 function syncRenderedWindow(centerIdx: number): void {
@@ -305,15 +305,7 @@ function handleDemoteToPrev(): void {
   const updatedPrev: Section = {
     ...prev,
     body: prev.body + textToAdd,
-    chunks: [
-      ...prev.chunks,
-      ...(curr.chunks || []).map((c, i) => ({
-        ...c,
-        id: `${prev.id}:p:${i}`,
-        chapter: prev.id,
-        paragraph: (prev.chunks.length > 0 ? prev.chunks[prev.chunks.length - 1].paragraph + 1 : 0) + c.paragraph
-      }))
-    ]
+    chunks: []
   };
 
   sections.value.splice(targetIdx - 1, 2, updatedPrev);
@@ -358,15 +350,7 @@ function handleDemoteNext(): void {
   const updatedCurr: Section = {
     ...curr,
     body: curr.body + addedText,
-    chunks: [
-      ...curr.chunks,
-      ...(next.chunks || []).map((c, i) => ({
-        ...c,
-        id: `${curr.id}:next_p:${i}`,
-        chapter: curr.id,
-        paragraph: (curr.chunks.length > 0 ? curr.chunks[curr.chunks.length - 1].paragraph + 1 : 0) + c.paragraph
-      }))
-    ]
+    chunks: []
   };
 
   const nextId = next.id;
@@ -393,9 +377,7 @@ function handleApplyRename(): void {
 
   const sec = activePopoverSection.value;
   sec.title = editTitle.value.trim();
-  if (editVolume.value.trim()) {
-    sec.volume = editVolume.value.trim();
-  }
+  sec.volume = editVolume.value.trim();
 
   const found = sections.value.find(s => s.id === sec.id);
   if (found) {
@@ -487,10 +469,6 @@ async function saveAndOpenReader(): Promise<void> {
     normalized.forEach((sec, idx) => {
       sec.index = idx;
       sec.id = `${identity}:${idx}`;
-      sec.chunks.forEach((c, cIdx) => {
-        c.chapter = sec.id;
-        c.index = cIdx;
-      });
     });
 
     savePercent.value = 45;

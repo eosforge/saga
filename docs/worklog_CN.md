@@ -22,7 +22,9 @@
 | 2026-10-21 | PKG-01：接入 .saga ZIP 容器格式、原生导入导出引擎、修复阅读视口章节错位并支持无缝拖拽导入。 | [架构](architecture_CN.md)、[任务台账](tasks_CN.md) |
 | 2026-10-21 | PKG-02：纯单文件 .saga 磁盘存储架构（无目录解压）、全内存切片打包入库，并彻底清除历史兼容回退代码。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-21T09-40-46-764Z-64234f34/receipt.json) |
 | 2026-10-22 | PERF-01：基于余量阈值的零拷贝分块压缩算法、O(1) 审校索引、持久化全屏阻断遮罩、导入与审校保存确定性 0-100% 进度显示、审校后视图彻底销毁及阅读器后退直达书架。 | [架构](architecture_CN.md)、[前端应用](../apps/windows/src/App.vue) |
-| 2026-10-22 | STORE-03：移除 SQLite sections 章节数据表，章节目录直接由 .saga manifest.bin 与零拷贝分卷索引承载，saga.db 大小由 1,444 KB 缩减至 ~8 KB，并新增启动后台预热实现 0ms 秒开阅读。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-22T10-22-08-229Z-6df95b30/receipt.json) |
+| 2026-10-22 | STORE-03：移除 SQLite sections 章节数据表，章节目录直接由 .saga manifest.bin 与零拷贝分卷索引承载，saga.db 大小由 1,444 KB 缩减至约 8 KB，并新增启动后台预热以快速进入阅读。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-22T10-22-08-229Z-6df95b30/receipt.json) |
+| 2026-10-23 | READ-02：SQLite books 表持久化阅读进度、防抖 IPC 同步、打开阅读器时按段落恢复位置，以及按最近阅读顺序排序。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-23T03-27-10-286Z-1cd1ddea/receipt.json) |
+| 2026-10-23 | REPAIR-01：归档/书架目录故障恢复、完整导入校验与资源保留、核验/进度/生命周期修复、解析边界及屏外章节清理。确认多章分片压缩后目标为 <256 KiB；单章超限仍接受。 | [契约](maintenance_CN.md)、[本地结果](evidence/2026-10-23-repair/result.json)、[剩余缺口](tasks_CN.md) |
 
 ## 历史归档
 

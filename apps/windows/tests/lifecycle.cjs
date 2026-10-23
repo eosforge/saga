@@ -20,7 +20,8 @@ function fixture(loading = Promise.resolve()) {
     activeBook: vue.ref({ id: "book", sections: [], currentChapterIndex: 0 }),
     activeAuditReport: vue.ref(null), isGlobalBusy: vue.ref(false),
     failure: vue.ref(""), activeSentenceIndex: vue.ref(0), isPlaying: vue.ref(false), hasAudio: vue.ref(true),
-    ensureBookLoaded: () => loading, togglePlay: () => { toggles++; }, pause() {}
+    ensureBookLoaded: () => loading, togglePlay: () => { toggles++; }, pause() {},
+    flushReadingProgress: async () => {}, saveReadingProgress: () => {}
   };
   function component(filename, exposed) {
     const source = readFileSync(join(__dirname, "../src", filename), "utf8").match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1];

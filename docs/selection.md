@@ -28,7 +28,7 @@ The selected client direction is Tauri 2.0 + Web Core using TypeScript, Vue 3, a
 
 The frontend direction uses Vue 3 Composition API, Pinia, and Vite, with Shadcn-Vue/Radix-Vue and Tailwind for accessible primitives and source-owned styling. Mobile drawers and desktop/tablet popovers would share behavior. These are selection decisions, not a list of installed dependencies.
 
-Historical frontend assumptions were 3–10 minute speech tracks, 200–500 active sentence nodes, 10–30 Hz playback updates, highlight updates below 0.2 ms and 0.3% CPU, and CSS below 20 KB. They require measurement; current continuous reading does not implement a bounded DOM window.
+Historical frontend assumptions were 3–10 minute speech tracks, 200–500 active sentence nodes, 10–30 Hz playback updates, highlight updates below 0.2 ms and 0.3% CPU, and CSS below 20 KB. They require measurement. Current continuous reading trims distant offscreen chapters, but a large individual chapter remains fully rendered and no total DOM/memory budget is established; see [maintenance](maintenance.md).
 
 The selected server direction is Rust with Tokio, Axum, and SQLx. Shared protocol types, CAS hashing, and HLC logic would reduce duplicated contracts. Rust's type and ownership checks support that choice without proving all runtime behavior. Historical throughput and memory assumptions were multiple GB/s and 10–20 MB per instance; they remain unmeasured.
 

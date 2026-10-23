@@ -372,6 +372,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn terminal_and_quote_vectors_match_lazy_display() {
+        let chunks = split_sentences("甲！？乙。\"\n\nEnglish!? remains together.\n🙂；尾声", "fixture");
+        let text: Vec<_> = chunks.iter().map(|chunk| chunk.text.as_str()).collect();
+        assert_eq!(text, ["甲！", "？", "乙。\"", "English!? remains together.", "🙂；", "尾声"]);
+        assert_eq!(chunks.iter().map(|chunk| chunk.paragraph).collect::<Vec<_>>(), [0, 0, 0, 1, 2, 2]);
+    }
+
+    #[test]
     fn test_chapter_heading_detection() {
         assert!(is_chapter_heading("第一章 宴桃园豪杰三结义"));
         assert!(is_chapter_heading("第124章 坐忘道"));
