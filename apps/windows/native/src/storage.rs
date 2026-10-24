@@ -721,6 +721,71 @@ pub(super) fn summaries(conn: &Connection) -> Result<Vec<BookSummary>, String> {
     rows.collect::<Result<_, _>>().map_err(|error| error.to_string())
 }
 
+/// Captures readable catalog and review state in one read transaction, without opening archives.
+pub(super) fn snapshot(conn: &Connection) -> Result<Vec<u8>, String> {
+    let _access = ACCESS.read().map_err(|_| "storage access is poisoned")?;
+    let transaction = conn.unchecked_transaction().map_err(|error| error.to_string())?;
+    let books = {
+        let mut statement = transaction.prepare(
+            "SELECT id,title,author,description,chapters,format,first_chapter,last_chapter_index,last_paragraph_index,last_scroll_ratio,last_read_time,created_at FROM books ORDER BY id"
+        ).map_err(|error| error.to_string())?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "id": row.get::<_, String>(0)?, "title": row.get::<_, String>(1)?,
+                    "author": row.get::<_, String>(2)?, "description": row.get::<_, String>(3)?,
+                    "chapters": row.get::<_, u32>(4)?, "format": row.get::<_, String>(5)?,
+                    "first_chapter": row.get::<_, String>(6)?, "last_chapter_index": row.get::<_, u32>(7)?,
+                    "last_paragraph_index": row.get::<_, u32>(8)?, "last_scroll_ratio": row.get::<_, f64>(9)?,
+                    "last_read_time": row.get::<_, i64>(10)?, "created_at": row.get::<_, i64>(11)?
+                }))
+            })
+            .map_err(|error| error.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|error| error.to_string())?
+    };
+    let reviews = {
+        let mut statement = transaction
+            .prepare("SELECT book_id,fingerprint FROM reviews ORDER BY book_id,fingerprint")
+            .map_err(|error| error.to_string())?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "book_id": row.get::<_, String>(0)?, "fingerprint": row.get::<_, String>(1)?
+                }))
+            })
+            .map_err(|error| error.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|error| error.to_string())?
+    };
+    transaction.commit().map_err(|error| error.to_string())?;
+    let mut bytes = serde_json::to_vec_pretty(&serde_json::json!({
+        "format": "saga-library-state", "version": 1, "books": books, "reviews": reviews
+    }))
+    .map_err(|error| error.to_string())?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
+/// Publishes an explicitly selected JSON export; failed writes leave an existing destination intact.
+pub(super) fn export(bytes: &[u8], target: &Path) -> Result<(), String> {
+    if !target
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("json"))
+    {
+        return Err("请选择 .json 导出文件".into());
+    }
+    let staging = Staging(temporary(target, "export"));
+    let mut file = std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&staging.0)
+        .map_err(|error| error.to_string())?;
+    file.write_all(bytes).map_err(|error| error.to_string())?;
+    file.sync_all().map_err(|error| error.to_string())?;
+    drop(file);
+    std::fs::rename(&staging.0, target).map_err(|error| format!("cannot publish export {}: {error}", target.display()))
+}
+
 /// Updates user's durable reading progress for a given book.
 pub(super) fn update_progress(conn: &Connection, book_id: &str, chapter_index: u32, paragraph_index: u32, scroll_ratio: f64) -> Result<(), String> {
     let _access = ACCESS.read().map_err(|_| "storage access is poisoned")?;
@@ -729,15 +794,16 @@ pub(super) fn update_progress(conn: &Connection, book_id: &str, chapter_index: u
     }
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
     let changed = conn
-        .execute(
+        .prepare_cached(
             "UPDATE books
          SET last_chapter_index = ?1,
              last_paragraph_index = ?2,
              last_scroll_ratio = ?3,
              last_read_time = ?4
-         WHERE id = ?5 AND ((chapters > 0 AND ?1 < chapters) OR (chapters = 0 AND ?1 = 0 AND ?2 = 0 AND ?3 = 0))",
-            params![chapter_index, paragraph_index, scroll_ratio, now, book_id],
+          WHERE id = ?5 AND ((chapters > 0 AND ?1 < chapters) OR (chapters = 0 AND ?1 = 0 AND ?2 = 0 AND ?3 = 0))",
         )
+        .map_err(|e| format!("failed to prepare reading progress: {e}"))?
+        .execute(params![chapter_index, paragraph_index, scroll_ratio, now, book_id])
         .map_err(|e| format!("failed to update reading progress: {e}"))?;
     if changed != 1 {
         return Err("book is missing or reading chapter is out of range".into());

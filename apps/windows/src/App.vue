@@ -7,7 +7,8 @@ import AuditView from "./views/Audit.vue";
 import ProfileView from "./views/Profile.vue";
 import SettingsView from "./views/Settings.vue";
 import MiniBar from "./components/Bar.vue";
-import { togglePlay, nextSentence, prevSentence, activeAuditReport, pause, hasAudio, isGlobalBusy } from "./stores/library";
+import { togglePlay, nextSentence, prevSentence, activeAuditReport, pause, hasAudio, isGlobalBusy, failure } from "./stores/library";
+import { register, closing } from "./lifecycle";
 
 type TabType = "shelf" | "reader" | "audit" | "settings" | "profile";
 
@@ -15,6 +16,7 @@ const currentTab = ref<TabType>("shelf");
 const isCollapsed = ref(false);
 const historyStack = ref<TabType[]>(["shelf"]);
 const historyIndex = ref(0);
+let unregister: (() => void) | undefined;
 
 function switchTab(tab: TabType, pushHistory: boolean | "replace" = true, force = false): void {
   if (!force && isGlobalBusy?.value) return;
@@ -76,7 +78,7 @@ watch(activeAuditReport, (report) => {
 });
 
 function handleMouseNavigation(e: MouseEvent): void {
-  if (isGlobalBusy?.value) {
+  if (closing.value || isGlobalBusy?.value) {
     e.preventDefault();
     e.stopPropagation();
     return;
@@ -100,6 +102,11 @@ function toggleSidebar(): void {
 }
 
 function handleGlobalKeydown(e: KeyboardEvent): void {
+  if (closing.value) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
   if (isGlobalBusy?.value) {
     e.preventDefault();
     e.stopPropagation();
@@ -124,13 +131,15 @@ function handleGlobalKeydown(e: KeyboardEvent): void {
 }
 
 onMounted(() => {
-  window.addEventListener("keydown", handleGlobalKeydown);
+  unregister = register();
+  window.addEventListener("keydown", handleGlobalKeydown, true);
   window.addEventListener("mouseup", handleMouseNavigation);
 
 });
 
 onUnmounted(() => {
-  window.removeEventListener("keydown", handleGlobalKeydown);
+  unregister?.();
+  window.removeEventListener("keydown", handleGlobalKeydown, true);
   window.removeEventListener("mouseup", handleMouseNavigation);
   pause();
 });
@@ -138,8 +147,9 @@ onUnmounted(() => {
 
 <template>
   <div class="saga-app">
+    <div v-if="closing" class="closing-overlay" role="status" aria-live="polite">正在保存阅读进度…</div>
     <!-- Desktop Left Sidebar -->
-    <aside class="sidebar" :class="{ collapsed: isCollapsed, 'busy-locked': !!isGlobalBusy }" :inert="!!isGlobalBusy">
+    <aside class="sidebar" :class="{ collapsed: isCollapsed, 'busy-locked': !!isGlobalBusy }" :inert="!!isGlobalBusy || closing">
       <div class="brand-block" title="点击折叠/展开侧边栏" @click="toggleSidebar">
         <img src="/logo.png" class="brand-logo" alt="Saga" />
         <span v-show="!isCollapsed" class="brand-title">Saga</span>
@@ -206,7 +216,8 @@ onUnmounted(() => {
     </aside>
 
     <!-- Main Content Area -->
-    <main class="content-stage">
+    <main class="content-stage" :inert="closing">
+      <p v-if="failure && currentTab !== 'reader' && currentTab !== 'shelf'" role="alert" class="storage-error">{{ failure }}</p>
       <div class="view-viewport">
         <ShelfView
           v-if="currentTab === 'shelf'"
@@ -228,7 +239,7 @@ onUnmounted(() => {
     </main>
 
     <!-- Mobile Adaptive Bottom TabBar (shown on narrow screens) -->
-    <nav class="mobile-tabbar" :class="{ 'busy-locked': !!isGlobalBusy }" :inert="!!isGlobalBusy">
+    <nav class="mobile-tabbar" :class="{ 'busy-locked': !!isGlobalBusy }" :inert="!!isGlobalBusy || closing">
       <button
         class="tab-btn"
         :class="{ active: currentTab === 'shelf' }"
@@ -269,6 +280,23 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.closing-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.85);
+  color: #f1f5f9;
+  cursor: wait;
+  touch-action: none;
+}
+
+.storage-error {
+  color: #fca5a5;
+  padding: 12px 24px;
+}
+
 .saga-app {
   display: flex;
   width: 100vw;

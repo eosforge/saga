@@ -17,6 +17,8 @@
 | TASK-07 | 仓库整理 | IMPLEMENTED; LOCAL VERIFICATION | 2026-10-20 | CLEAN-01 存储/错误修复、可移植路径、分句/生命周期整合、本地检查和文档。 | [契约与证据](maintenance_CN.md)。正式合格性认定仍属于 GAP-04。 |
 | TASK-08 | protocol, apps/windows/native | IMPLEMENTED; LOCAL VERIFICATION | 2026-10-21 | .saga 资产包格式、清单引擎与单文件书库存储。 | ZIP 容器构建/读取、SGMF 二进制清单往返序列化、O(1) 章节查找、压缩后小于 256 KiB 的多章分片（允许单章超限），以及每本书使用单个归档。当前全书加载会解码全部正文；跨工具链的归档确定性与崩溃原子性尚未得到验证。 |
 | TASK-09 | 仓库修复 | IMPLEMENTED; LOCAL VERIFICATION | 2026-10-23 | REPAIR-01 归档/书架目录回滚、包校验与资源保留、核验文本映射、阅读进度、过期响应防护、解析边界及文档校正。 | [契约与限制](maintenance_CN.md)、[本地证据](evidence/2026-10-23-repair/result.json)。桌面交互、异常关闭恢复、总体内存边界及发布合格性认定仍待完成。 |
+| TASK-10 | 常驻书架目录与进度保存 | IMPLEMENTED; LOCAL VERIFICATION | 2026-10-23 | RESIDENT-01 常驻 SQLite 连接、缓存的进度更新、五档保存间隔、后台/正常关闭刷新及显式可读 JSON 导出。 | [契约](maintenance_CN.md#常驻书架目录与有界进度保存resident-01)、[本地证据](evidence/2026-10-23-resident/result.json)。真实桌面关闭事件交付、移动端能耗/挂起及崩溃/断电合格性认定仍待完成。 |
+| TASK-11 | 本地朗读工具 | OPEN; AUDIT RECORDED | 2026-10-24 | SPEECH-01 面向当前电脑的 Windows 便携语音引擎包，保留原文并使用单一朗读音色。 | [审核与待完成的本机检查](speech_CN.md)。模型选择、封装、完整章节生成、资源测量、离线运行、目录迁移及持续使用验证仍待完成。 |
 
 ## 缺口与剩余验证
 

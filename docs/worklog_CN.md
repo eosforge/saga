@@ -25,6 +25,9 @@
 | 2026-10-22 | STORE-03：移除 SQLite sections 章节数据表，章节目录直接由 .saga manifest.bin 与零拷贝分卷索引承载，saga.db 大小由 1,444 KB 缩减至约 8 KB，并新增启动后台预热以快速进入阅读。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-22T10-22-08-229Z-6df95b30/receipt.json) |
 | 2026-10-23 | READ-02：SQLite books 表持久化阅读进度、防抖 IPC 同步、打开阅读器时按段落恢复位置，以及按最近阅读顺序排序。 | [架构](architecture_CN.md)、[回执](evidence/2026-10-23T03-27-10-286Z-1cd1ddea/receipt.json) |
 | 2026-10-23 | REPAIR-01：归档/书架目录故障恢复、完整导入校验与资源保留、核验/进度/生命周期修复、解析边界及屏外章节清理。确认多章分片压缩后目标为 <256 KiB；单章超限仍接受。 | [契约](maintenance_CN.md)、[本地结果](evidence/2026-10-23-repair/result.json)、[剩余缺口](tasks_CN.md) |
+| 2026-10-23 | RESIDENT-01：常驻 SQLite 连接与缓存进度写入；可配置 5/10/15/30/60 秒保存间隔、后台/正常关闭刷新及显式 JSON 状态导出。 | [架构](architecture_CN.md)、[契约与限制](maintenance_CN.md#常驻书架目录与有界进度保存resident-01)、[本地结果](evidence/2026-10-23-resident/result.json) |
+| 2026-10-24 | SPEECH-01：记录 Windows 便携语音审核、目标硬件、固定音色/保留原文约束及候选引擎；模型运行与本机合格性认定仍待完成。 | [审核](speech_CN.md)、[任务台账](tasks_CN.md) |
+| 2026-10-24 | REVIEW-01：审核待提交的常驻存储与朗读改动，阻断关闭保存期间的鼠标历史导航，并在已获授权的提交前校准中英文文档。 | [契约与限制](maintenance_CN.md#常驻书架目录与有界进度保存resident-01)、[审核结果](evidence/2026-10-24-review/result.json) |
 
 ## 历史归档
 

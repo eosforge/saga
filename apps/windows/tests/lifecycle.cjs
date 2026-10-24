@@ -35,6 +35,7 @@ function fixture(loading = Promise.resolve()) {
       require(name) {
         if (name === "vue") return { ...vue, watch: vue.watch, onMounted: callback => { lifecycle.mount = callback; }, onUnmounted: callback => { lifecycle.unmount = callback; } };
         if (name.endsWith("stores/library")) return library;
+        if (name === "./lifecycle") return { register: () => () => {}, closing: vue.ref(false) };
         if (name.endsWith(".vue")) return {};
         if (name === "../text") return require("./support/loader.cjs")()("text.ts");
         if (name === "@tauri-apps/api/core") return { isTauri: () => true, invoke: async () => "pong" };

@@ -41,6 +41,59 @@ fn database() -> Connection {
     storage::initialize(&c).unwrap();
     c
 }
+
+#[test]
+fn resident_progress_is_readable_after_owner_shutdown_and_json_export() {
+    let directory = sandbox("resident-progress");
+    let path = directory.join("catalog.db");
+    let owner = crate::database::Database::open(&path).unwrap();
+    owner
+        .execute(|connection| {
+            storage::save(connection, &novel(), "TXT", &directory)?;
+            for ratio in [0.25, 0.5, 0.75] {
+                storage::update_progress(connection, "probe", 0, 0, ratio)?;
+            }
+            connection
+                .execute("INSERT INTO reviews(book_id,fingerprint) VALUES('probe','retained-fixture')", [])
+                .map_err(|error| error.to_string())?;
+            Ok(())
+        })
+        .unwrap();
+    drop(owner);
+    let owner = crate::database::Database::open(&path).unwrap();
+    let bytes = owner.execute(storage::snapshot).unwrap();
+    let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(value["format"], "saga-library-state");
+    assert_eq!(value["version"], 1);
+    assert_eq!(value["books"].as_array().unwrap().len(), 1);
+    assert_eq!(value["books"][0]["id"], "probe");
+    assert_eq!(value["books"][0]["title"], "Original");
+    assert_eq!(value["books"][0]["last_scroll_ratio"], 0.75);
+    assert!(value["books"][0]["last_read_time"].as_i64().unwrap() > 0);
+    assert_eq!(value["reviews"][0]["fingerprint"], "retained-fixture");
+    let destination = directory.join("library.json");
+    fs::write(&destination, b"previous export").unwrap();
+    storage::export(&bytes, &destination).unwrap();
+    assert_eq!(fs::read(&destination).unwrap(), bytes);
+    assert!(storage::export(&bytes, &path).is_err());
+    assert_eq!(owner.execute(storage::summaries).unwrap()[0].last_scroll_ratio, 0.75);
+    drop(owner);
+}
+
+#[cfg(windows)]
+#[test]
+fn rejected_json_replacement_preserves_the_previous_export() {
+    use std::os::windows::fs::OpenOptionsExt;
+
+    let directory = sandbox("export-denied");
+    let destination = directory.join("library.json");
+    fs::write(&destination, b"previous export").unwrap();
+    let locked = fs::OpenOptions::new().read(true).share_mode(1).open(&destination).unwrap();
+    assert!(storage::export(b"replacement", &destination).is_err());
+    assert_eq!(fs::read(&destination).unwrap(), b"previous export");
+    assert_eq!(fs::read_dir(&*directory).unwrap().count(), 1);
+    drop(locked);
+}
 fn novel() -> Novel {
     Novel {
         book: Book {

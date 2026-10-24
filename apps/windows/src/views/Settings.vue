@@ -2,7 +2,32 @@
 /** Display actual storage location and explicitly unavailable preferences. */
 import { ref, onMounted } from "vue";
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { showHeroBanner } from "../stores/library";
+import { showHeroBanner, saveInterval, saveIntervals, configureSaving, flushReadingProgress } from "../stores/library";
+
+const exporting = ref(false);
+const exportStatus = ref("");
+
+/** Flush the current reading position before requesting an explicit native JSON export. */
+async function onExport(): Promise<void> {
+  if (!isTauri() || exporting.value) return;
+  exporting.value = true;
+  exportStatus.value = "";
+  try {
+    await flushReadingProgress();
+    const destination = await invoke<string | null>("export_library_state");
+    exportStatus.value = destination ? "已导出：" + destination : "已取消导出";
+  } catch (error) {
+    exportStatus.value = "导出失败：" + error;
+  } finally { exporting.value = false; }
+}
+
+/** Map the five slider positions to the supported save intervals in seconds. */
+function onInterval(event: Event): void {
+  const control = event.target;
+  if (!(control instanceof HTMLInputElement)) return;
+  const seconds = saveIntervals[Number(control.value)];
+  if (seconds !== undefined) configureSaving(seconds);
+}
 
 // Resolve storage from the host instead of embedding a developer's filesystem.
 const storagePath = ref(isTauri() ? "正在读取…" : "浏览器内存（刷新后清空）");
@@ -23,6 +48,20 @@ onMounted(async () => {
       <span class="mode-badge dev">{{ isTauri() ? "桌面原型" : "浏览器预览" }}</span>
     </header>
     <section class="config-section">
+      <h2 class="section-title">阅读进度</h2>
+      <div class="config-card">
+        <div class="config-row">
+          <div class="config-meta">
+            <label class="config-name" for="save-interval">自动保存间隔：{{ saveInterval }} 秒</label>
+            <span class="config-desc">持续阅读时按所选间隔保存最新位置；切换后台、返回书架和正常关闭时提前保存。</span>
+            <input id="save-interval" class="interval-slider" type="range" min="0" max="4" step="1"
+              :value="saveIntervals.findIndex(seconds => seconds === saveInterval)" :aria-valuetext="saveInterval + ' 秒'" @input="onInterval" />
+            <div class="interval-labels" aria-hidden="true"><span v-for="seconds in saveIntervals" :key="seconds">{{ seconds }} 秒</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="config-section">
       <h2 class="section-title">💾 数据与存储位置</h2>
       <div class="config-card">
         <div class="config-row">
@@ -31,13 +70,21 @@ onMounted(async () => {
             <span class="config-desc">开发构建使用当前仓库的 data 目录；发布构建使用系统应用数据目录。</span>
             <div class="path-display-box"><span class="path-text">{{ storagePath }}</span></div>
             <div class="sub-paths">
-              <span>storage/saga.db：书籍、章节与核验决定</span>
+              <span>storage/saga.db：书架信息、阅读进度与核验决定</span>
               <span>books/&lt;id&gt;.saga：单文件归档存储正文与分块数据</span>
             </div>
           </div>
           <div class="actions-col">
             <button class="btn-secondary" disabled title="尚未实现目录迁移">更改目录（未实现）</button>
           </div>
+        </div>
+        <div class="config-row">
+          <div class="config-meta">
+            <span class="config-name">导出书架与阅读记录</span>
+            <span class="config-desc">以可阅读的 JSON 保存书架信息、阅读位置与核验决定，不包含书籍正文。</span>
+            <span v-if="exportStatus" class="config-desc" role="status">{{ exportStatus }}</span>
+          </div>
+          <button class="btn-secondary" :disabled="!isTauri() || exporting" @click="onExport">{{ exporting ? '正在导出…' : '导出 JSON' }}</button>
         </div>
       </div>
     </section>
@@ -79,6 +126,21 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.interval-slider {
+  width: 100%;
+  max-width: 480px;
+  margin: 20px 0 8px;
+  accent-color: #38bdf8;
+}
+
+.interval-labels {
+  display: flex;
+  justify-content: space-between;
+  max-width: 480px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
 .settings-container {
   display: flex;
   flex-direction: column;

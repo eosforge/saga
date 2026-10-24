@@ -18,6 +18,7 @@
 | style.md | 项目编码差异与工具配置 |
 | maintenance.md | 本地流程、故障保证、验证范围与证据限制 |
 | segmentation.md | TXT 章节识别与已保留的核验决策 |
+| speech.md | 本地朗读约束、便携部署审核及待完成的本机验证 |
 | selection.md | 历史技术选型及其假设 |
 | proposals.md | 待审核设计 |
 | evidence/ | 经筛选并被引用的验证回执和结果 |

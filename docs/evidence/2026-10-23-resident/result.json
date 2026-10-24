@@ -1,0 +1,1420 @@
+{
+  "version": 1,
+  "milestone": "RESIDENT-01",
+  "recordedAt": "2026-10-23T11:47:24.568Z",
+  "status": "implemented-local-verification",
+  "qualification": "not-qualified",
+  "trust": "local-unsealed",
+  "authorization": {
+    "scope": "User approved implementation of retained SQLite connection, coalesced progress saving and readable export. Subsequent instructions selected a 30-second default with early saves on background/close and requested a five-choice 5/10/15/30/60 second Settings slider.",
+    "commit": false,
+    "applicationLaunch": false,
+    "liveDataMigration": false
+  },
+  "implementation": {
+    "connection": "One application-managed Mutex<Connection>, initialized in Tauri setup and reused by existing blocking commands; progress statements are prepared and cached.",
+    "scheduling": "Latest dirty anchor per book; one non-resetting timer; elapsed monotonic time survives interval changes; acknowledged unchanged positions do not write; failed IPC outcomes invalidate earlier acknowledgements.",
+    "settings": "Five discrete slider positions in seconds, default 30; retained through the existing webview localStorage preference convention, with default/session fallback on unavailable storage.",
+    "lifecycle": "Shelf return, hidden visibility, pagehide and desktop focus loss request early saving. Normal close prevents native destruction until pending progress succeeds; errors or an active book operation retain the window. Late subscriptions and replaced views are disposed.",
+    "export": "On-demand version-1 saga-library-state JSON contains catalog metadata, progress, timestamps and retained review fingerprints. Snapshot reads use one SQLite read transaction. A selected destination is replaced through a synced sibling staging file after releasing the database connection. It does not include book bodies or UI preferences and has no restore/import interface."
+  },
+  "source": {
+    "head": "b53d658b658b5b30f749522fbad8086fb3ac06fe",
+    "uncommitted": true,
+    "stagingEmpty": true,
+    "verifiedFiles": 113,
+    "sourceHashesMatchCheckReceipt": true,
+    "translationsUnchanged": 14,
+    "books": [
+      {
+        "path": "data/books/6df3a8a35926d56cbb141f5bacbcbeb81623e0f50414786b69cb1aaa4b900f7b.saga",
+        "sha256": "e5c700763321ed75598de65d35d0473b0a7ff8f76aa5dadd5a901b8fb99ea0fa",
+        "unchanged": true
+      }
+    ]
+  },
+  "verification": {
+    "checksPassed": 8,
+    "rust": {
+      "passed": 88,
+      "failed": 0,
+      "ignored": 2
+    },
+    "frontend": {
+      "passed": 67,
+      "failed": 0
+    },
+    "runner": {
+      "passed": 2,
+      "failed": 0
+    },
+    "sampleTests": "Two SAGA_SAMPLE-dependent original-book checks remain ignored; ordinary tests use isolated fixtures.",
+    "receipt": {
+      "identity": "2026-10-23T11-41-39-987Z-c5e65bf4",
+      "purpose": "local-feedback",
+      "qualification": "not-qualified",
+      "environment": {
+        "platform": "win32",
+        "architecture": "x64",
+        "node": "v24.18.0",
+        "rust": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+        "typescript": "5.9.3"
+      },
+      "before": [
+        {
+          "path": ".editorconfig",
+          "sha256": "9540382bb2e65edc589c6e9e965044465c52a6f4336398ed4dfcc622b3ec6ef1"
+        },
+        {
+          "path": ".gitattributes",
+          "sha256": "cfbcf2d11424f97f7ae6d6042a4ab66762db2fdc4ea567c1b8c2c722e07614f7"
+        },
+        {
+          "path": ".gitignore",
+          "sha256": "936e236f3cbfaf70b92919acd272f79635dd574bcd226139e33673820e30bc73"
+        },
+        {
+          "path": "AGENTS.md",
+          "sha256": "494a96425a8e6b6fb9106a85479f8aec64f69dd461a04f4db45ce3b73e10a4e8"
+        },
+        {
+          "path": "AGENTS_CN.md",
+          "sha256": "61324a819282d6f957986b6711bd0a146ff57ee9604572374f951dac86ffd7d3"
+        },
+        {
+          "path": "Cargo.lock",
+          "sha256": "a6d28f542b56dee90787b145eacd633955423991b9c247cbacf7df7a14ba819f"
+        },
+        {
+          "path": "Cargo.toml",
+          "sha256": "01aa1ccd342c6fae4f9062fd02ac60d465cbe292ec1bcd49ff1d1147e7fffaf7"
+        },
+        {
+          "path": "README.md",
+          "sha256": "043ca42c604d96f529d48c30d87e6b8f62e24b60f0363769b6663feeaab01d17"
+        },
+        {
+          "path": "README_CN.md",
+          "sha256": "1047ee9f26e29b43596962edff45682922a3c18a56008bf78cd0fbc6332408a4"
+        },
+        {
+          "path": "apps/windows/.npmrc",
+          "sha256": "c95f0d1fc57e8c33581b3e13bdbf174ac279874ae5a6c6d9822bdb933bcfb5b4"
+        },
+        {
+          "path": "apps/windows/index.html",
+          "sha256": "80b76eb17340f44b8bcdbbe3bf1267152593655d219c9495c941ad663aef8447"
+        },
+        {
+          "path": "apps/windows/native/Cargo.toml",
+          "sha256": "e92c00e4f9b82dad3f541bf5b5f8af5d07c2988ad618b69ff2911d2ee3c66dab"
+        },
+        {
+          "path": "apps/windows/native/build.rs",
+          "sha256": "dd942450408807b3ea93aae0a91f34f1efa58024eec07f0fa6c747f8810f8b32"
+        },
+        {
+          "path": "apps/windows/native/capabilities/default.json",
+          "sha256": "7a495826215b10029033565b8acae8cdaa2b08d762b45fc496d2eda7223ea6d4"
+        },
+        {
+          "path": "apps/windows/native/icons/128x128.png",
+          "sha256": "2e412a2c7c5378bc6bd7eb5b0e7e9f46e9027ceeb07d0bf1b26d563784a39024"
+        },
+        {
+          "path": "apps/windows/native/icons/128x128@2x.png",
+          "sha256": "9616fc5543d696cffd1e72e84d1fa2546277876728fece87c868259166afb48a"
+        },
+        {
+          "path": "apps/windows/native/icons/32x32.png",
+          "sha256": "7751b8efbd790b12f5ba5ce09e02f57f139c46663c3b380dbf5d9af2894ebcb3"
+        },
+        {
+          "path": "apps/windows/native/icons/icon.icns",
+          "sha256": "a1899f34c1a8333bc8d163b0b474d330fc3d0ac1ee306437f922dec10f455625"
+        },
+        {
+          "path": "apps/windows/native/icons/icon.ico",
+          "sha256": "00ff4cae1f6cba0e289a3f2978bb0b924168eea154e496705c7eb19a5edf83c0"
+        },
+        {
+          "path": "apps/windows/native/icons/icon.png",
+          "sha256": "2742237ba8fb48e7227dac3a17c99f7f35c1eae04db289f94c2c06aaad567bab"
+        },
+        {
+          "path": "apps/windows/native/icons/source.png",
+          "sha256": "a8c6bb08b9761950b07554bf820cb87fc06bc098010e9dd1066dcefb52256bcd"
+        },
+        {
+          "path": "apps/windows/native/src/database.rs",
+          "sha256": "3e1a38349d601463ead8f14b197c0eab41705f15c9c19da3f2d531f8171b2477"
+        },
+        {
+          "path": "apps/windows/native/src/ingestion.rs",
+          "sha256": "26b534af35342365b674d76b3f3f4036956a0924b62e7c61a4e027931c1ca26c"
+        },
+        {
+          "path": "apps/windows/native/src/lib.rs",
+          "sha256": "03836673b2d797677fc2ecba304af644010281fd3a3155db8dcdfa1d29ca8c42"
+        },
+        {
+          "path": "apps/windows/native/src/main.rs",
+          "sha256": "8b33ec1119d2771277ae37b11993aa68cdbd58e7912d7975cf31073eb562f6fb"
+        },
+        {
+          "path": "apps/windows/native/src/paths.rs",
+          "sha256": "cfef7c0b295560f4781a61f6553ae3313907625c25d203a8ac2d95af431bd530"
+        },
+        {
+          "path": "apps/windows/native/src/regression.rs",
+          "sha256": "a63b7044a2d22362683490509e276251cd3a08fe0593e8113f72ba8e78ebab4c"
+        },
+        {
+          "path": "apps/windows/native/src/review.rs",
+          "sha256": "a4fa3c4866622417263dc9c1f503e97e9fc6526ee3dbda8011f71e9d6a2addad"
+        },
+        {
+          "path": "apps/windows/native/src/storage.rs",
+          "sha256": "7bbea8e280ecf41d76985b58f99fed59bbb0ad1b82801ea63ea665f53120ee24"
+        },
+        {
+          "path": "apps/windows/native/tauri.conf.json",
+          "sha256": "1ea40771eac11e59737d248d74f81f0136d882ce65597d502d4904dbd8c23bb4"
+        },
+        {
+          "path": "apps/windows/package.json",
+          "sha256": "1cb1f68f924314b37d51d27ea835978f595cdf7ce5d30f9707f25e18675bb88e"
+        },
+        {
+          "path": "apps/windows/pnpm-lock.yaml",
+          "sha256": "25a13bbb14c7eddd6a5ded3332fd9b4723594d0f3afd88092638e1fc52a8935a"
+        },
+        {
+          "path": "apps/windows/pnpm-workspace.yaml",
+          "sha256": "ac02d96368617c760f093cfe61fdec64b6244007ab3553e0d6621f706f54a353"
+        },
+        {
+          "path": "apps/windows/public/favicon.ico",
+          "sha256": "00ff4cae1f6cba0e289a3f2978bb0b924168eea154e496705c7eb19a5edf83c0"
+        },
+        {
+          "path": "apps/windows/public/favicon.png",
+          "sha256": "1f69194ddf0a9ad6bd46b00a9253cc45d039020af44fe699c1ab4c8124672691"
+        },
+        {
+          "path": "apps/windows/public/logo.png",
+          "sha256": "2742237ba8fb48e7227dac3a17c99f7f35c1eae04db289f94c2c06aaad567bab"
+        },
+        {
+          "path": "apps/windows/src/App.vue",
+          "sha256": "18e24132a155fd924455d0253f6f332644b0b6fc0d090e6e2c2a3b960b166949"
+        },
+        {
+          "path": "apps/windows/src/components/Bar.vue",
+          "sha256": "6308f7a3b84fe04823b67c0e2b043de3995648565a9c8ed64a9bf08d3297ae21"
+        },
+        {
+          "path": "apps/windows/src/lifecycle.ts",
+          "sha256": "0218434fe779e418b6b3b90a3368fd70019b74c4d9e6e0cf9305241108828c03"
+        },
+        {
+          "path": "apps/windows/src/main.ts",
+          "sha256": "de8a34fe8ac5c4fa14a4f1c93351f4a8f88b07ce9adacd3c718fb86a5bb66e9e"
+        },
+        {
+          "path": "apps/windows/src/stores/library.ts",
+          "sha256": "ec4d9a7407c31a68b0169a65372e15943143e1e0173f5942221accd0f97d6db1"
+        },
+        {
+          "path": "apps/windows/src/style.css",
+          "sha256": "d60f0b0aca2db7c2843e10c960793580e7c14e53881fb66496966a5635492428"
+        },
+        {
+          "path": "apps/windows/src/text.ts",
+          "sha256": "4fffa888232e2de39cbde3035bdc2ea97e7d9257a795fddd16c01d812894cf85"
+        },
+        {
+          "path": "apps/windows/src/views/Audit.vue",
+          "sha256": "90cf8d0f768b8ef1c70dc79c33c827456258075d82b7d80a975f7288ad76e73e"
+        },
+        {
+          "path": "apps/windows/src/views/Profile.vue",
+          "sha256": "554b86ffc521e65850ada12badee5e3bb5f283318bfe97f503cc02697bbc780d"
+        },
+        {
+          "path": "apps/windows/src/views/Reader.vue",
+          "sha256": "c8b8e9c6076ddcbe38866827065aa93969ea82ac64a58cd4465a9dc429dac234"
+        },
+        {
+          "path": "apps/windows/src/views/Settings.vue",
+          "sha256": "bc08a5e14ab5dd57185bcbd8518c61a9cf08b6b7b8d36c2a692a7470060e6a2c"
+        },
+        {
+          "path": "apps/windows/src/views/Shelf.vue",
+          "sha256": "41b90d293558ac50f326fd079e873351d5b4f29bda88ca6ebda7dbb81a51082b"
+        },
+        {
+          "path": "apps/windows/tests/audit.cjs",
+          "sha256": "3ec0b47663af2fbbdd6dd6f1f9836d70a90755a94feec2574111d4aab8de73a3"
+        },
+        {
+          "path": "apps/windows/tests/import.cjs",
+          "sha256": "cfa78690e4e9fb85c1c435ff425f51274a60bd4532a84cb46221bd2b359dc09e"
+        },
+        {
+          "path": "apps/windows/tests/library.cjs",
+          "sha256": "d6556e8521b038cc7823c426d3858db7635ee2f75af05c42e63cd7b6af385d7f"
+        },
+        {
+          "path": "apps/windows/tests/lifecycle.cjs",
+          "sha256": "1cf732b4fde63364fb3d1aa0c422222cce8c7454a09d5363677c2c00707d8fd4"
+        },
+        {
+          "path": "apps/windows/tests/persistence.cjs",
+          "sha256": "492ef2dcc3f30b3f656bcdeecbd763c5c01611f7b73dd0cf5cd6e1718c644ef8"
+        },
+        {
+          "path": "apps/windows/tests/reader.cjs",
+          "sha256": "bd18067da4abf4d103a1d45dcba50284a1b80e2ff0579feb3d3fd35c16f156de"
+        },
+        {
+          "path": "apps/windows/tests/regression.cjs",
+          "sha256": "635ce98558650cdf2041a1f30662035b7fc999150fde724295a3183b844aa13a"
+        },
+        {
+          "path": "apps/windows/tests/support/loader.cjs",
+          "sha256": "d3570547d4daa9ca4a30b04be58e5931a07e4b320ffc70c91e65b8f437fbd77a"
+        },
+        {
+          "path": "apps/windows/tools/style.cjs",
+          "sha256": "575a7ffc3613499387657cc1b9e9414187627e6021eb2c81c56f4b614dbcedb0"
+        },
+        {
+          "path": "apps/windows/tsconfig.json",
+          "sha256": "464de2370810ebcbf405b0c64773f6147495a821846ff83170fc7d4c0e1875cf"
+        },
+        {
+          "path": "apps/windows/vite.config.ts",
+          "sha256": "ee5ef5259844fd021907f6b7dc0675a871591adc217a103ccffd77fc10c685cb"
+        },
+        {
+          "path": "development.json",
+          "sha256": "9b4b09caec909a23dcc7096056aef0d561ae5be0e71bd9fdaa9dc205e2ada4ab"
+        },
+        {
+          "path": "docs/architecture.md",
+          "sha256": "d117d977ebd2baf4df80f6aa73d433609e10f9781b33ec6b1098a3ef379233a5"
+        },
+        {
+          "path": "docs/architecture_CN.md",
+          "sha256": "a92c84db2df2ee230377323985556720ec5653781325aa10de0872355e845399"
+        },
+        {
+          "path": "docs/chronicle/.gitkeep",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "docs/chronicle/2026-10-19-worklog.json",
+          "sha256": "ac0d9ba01a6f16445d73ac66f1d47df5245d95fa46ce6a9cb344af051a2c7fc7"
+        },
+        {
+          "path": "docs/chronicle/2026-10-19-worklog.md",
+          "sha256": "1eccc1c0d182bd54ff26412cb831d3802d3a2a66f96b6825924dbde1fca83ffc"
+        },
+        {
+          "path": "docs/chronicle/2026-10-19-worklog_CN.md",
+          "sha256": "4b83408f501eba33c05cad5dcc7dbb07a48f4e9f2f289a810cd60abc5773776e"
+        },
+        {
+          "path": "docs/coding.md",
+          "sha256": "6bed790a36506c51c4e535b23ca6fa047668244b082f8a8620ba458e3d29896b"
+        },
+        {
+          "path": "docs/coding_CN.md",
+          "sha256": "8a699d09544236085a3adf152908059e6c9b1fc03125bc0418ae239a037fc173"
+        },
+        {
+          "path": "docs/development.md",
+          "sha256": "62b9bc5b99cabdb480ef960a0be7ed454bfe25c7b878ef8e8e7b9318393f8247"
+        },
+        {
+          "path": "docs/development_CN.md",
+          "sha256": "7bfd0a492a06db200fc48ff61929957580770c5de38ca645356b01bc2e040004"
+        },
+        {
+          "path": "docs/documentation.md",
+          "sha256": "93179de59bef3174ff5059c32116dc9efdf59bec67404d2854e04b5556009a0c"
+        },
+        {
+          "path": "docs/documentation_CN.md",
+          "sha256": "92a342eabd0ebeb60319efdd38da30e774d8c17c8dbf69337acf945100622625"
+        },
+        {
+          "path": "docs/maintenance.md",
+          "sha256": "a11a92e33862306d0e05b543611dc34e5ebf08bd84c4da4a87c0c6cf10cb3603"
+        },
+        {
+          "path": "docs/maintenance_CN.md",
+          "sha256": "630e0f72b31381398e10aa58e18204d0ff3206fc6f55e9696f1f06b33b076d13"
+        },
+        {
+          "path": "docs/proposals.md",
+          "sha256": "0144b55f3880b5dfa771bf1079c7852fdb50c4c0dc70d994d882452acad84245"
+        },
+        {
+          "path": "docs/proposals_CN.md",
+          "sha256": "78eee5420745bb1ccf5804971516d9970d66276a68e29fe0fb25a15be28c593d"
+        },
+        {
+          "path": "docs/segmentation.md",
+          "sha256": "403df6b272f8c1b8557248d47c83d0c86b43881c1a62e5b4d0ac7cdc75e3b8fa"
+        },
+        {
+          "path": "docs/segmentation_CN.md",
+          "sha256": "fa74ab74039802001c95c98131584936e3e16cc498dc4214366540304736b001"
+        },
+        {
+          "path": "docs/selection.md",
+          "sha256": "5cb47d45849927ad7698d3d65fd62ad672e1a0e92b5bf418e8477af58d062a68"
+        },
+        {
+          "path": "docs/selection_CN.md",
+          "sha256": "e02742db7bb978b29bf58de2f87e493c244b6fa922c17106b77cdad2348fef6b"
+        },
+        {
+          "path": "docs/style.md",
+          "sha256": "02487b5d11aabd612e68b8a1e05374e3808af253caf88a3ab90955a87df29753"
+        },
+        {
+          "path": "docs/style_CN.md",
+          "sha256": "5f8df23cb21c608a6e82c2a7e4062c044e4367c901b5e6b79f1c1582f258d32e"
+        },
+        {
+          "path": "docs/tasks.md",
+          "sha256": "cc7a1158dc0801ee206bd63b83c64e9294315c903f76c051609520eeb853d0ea"
+        },
+        {
+          "path": "docs/tasks_CN.md",
+          "sha256": "d330d6fc25c7c475fcae4d8ee18de132a4e8a1c25c165b9d6d5a974fe86ca8ff"
+        },
+        {
+          "path": "docs/worklog.md",
+          "sha256": "6b9c71aabcc6a73ef053e00e921a8cb90207ef24c564a3d83c37c7f7cb99a1ec"
+        },
+        {
+          "path": "docs/worklog_CN.md",
+          "sha256": "96ac056d06c1b30315fc3ec8fdc2c8a1044ccbb353bd509812335938bbc60ef8"
+        },
+        {
+          "path": "packages/reader/Cargo.toml",
+          "sha256": "400ed35b27c7c9a09f2f24ce8f383371454b735fcfed83c203e69eeda3eb4111"
+        },
+        {
+          "path": "packages/reader/src/heading.rs",
+          "sha256": "067d25babc0e4af73c9a020be6ff6feac41017936a2f27fa24eacfd4c1f4706c"
+        },
+        {
+          "path": "packages/reader/src/lib.rs",
+          "sha256": "af8755d4a9c77aad7877231c5d747ab79b482d6f53141f04663bc016a5b400d3"
+        },
+        {
+          "path": "packages/reader/src/validator.rs",
+          "sha256": "0d09ba1c6d1a8df2be407bcb64b1ce95179eac9498ba70636acb49e72b09f735"
+        },
+        {
+          "path": "packages/reader/tests/segmentation.rs",
+          "sha256": "a3a757784d723c4983dfc9e8c6c002d31bbd9b0bb9cb97443f2ac31ea8643207"
+        },
+        {
+          "path": "protocol/Cargo.toml",
+          "sha256": "1793ec8020ec412cf3d7e1873e1e91e1ae998a5a0049e978d38c31d8c2dfb32e"
+        },
+        {
+          "path": "protocol/bindings/AnomalyType.ts",
+          "sha256": "6f44a2672b1150eb6917ae4942efbb464bae652996741c6e0a8ed7d60cd56f0f"
+        },
+        {
+          "path": "protocol/bindings/Book.ts",
+          "sha256": "59ac00539b8fa5b0905382b3dacd41f8e1807937a84e16886b9e91d8afc36af5"
+        },
+        {
+          "path": "protocol/bindings/BookSummary.ts",
+          "sha256": "2a84129383c71da73e8212472942b611b2e0dcd330ae5afce525c7cd82ac14b8"
+        },
+        {
+          "path": "protocol/bindings/Chapter.ts",
+          "sha256": "a7a7e010fd6cb561e158abb0ad6093d1268ccc074b817ef8ae9f4c4b0447c6fe"
+        },
+        {
+          "path": "protocol/bindings/Chunk.ts",
+          "sha256": "cdb38d070f1b3c3310360006ea3c6903edc5fa59ace788c04e0d9bc07ac8f8ca"
+        },
+        {
+          "path": "protocol/bindings/ImportProgress.ts",
+          "sha256": "63b8b77296e596a166d16672483cf5ecb39b6c0debf5837c8719f1bf4c16d4f6"
+        },
+        {
+          "path": "protocol/bindings/Manifest.ts",
+          "sha256": "e3eebc726bd13b5acbe03a83fb5d61e71f7120f8e6cf94b61497e48e61f32311"
+        },
+        {
+          "path": "protocol/bindings/Novel.ts",
+          "sha256": "422a6e26bc7bb5a45d7aa8ec61a0bb261e044710c67b02530f11dd961da55144"
+        },
+        {
+          "path": "protocol/bindings/NovelImportResult.ts",
+          "sha256": "7c057ce6bc42b080a322e42d35aac8a545ac85688d9a2fc4a7e5a7a608adfc22"
+        },
+        {
+          "path": "protocol/bindings/NovelValidation.ts",
+          "sha256": "488a48bcf891723ad822c697a25db5f28c52bbb51dea4a31f00f302dc3fb6101"
+        },
+        {
+          "path": "protocol/bindings/Section.ts",
+          "sha256": "4ed5a9fe563ecf8ad24cd5a1bd702c7c2a4bd768ca1b78942ad69ae1dd093ccf"
+        },
+        {
+          "path": "protocol/bindings/Span.ts",
+          "sha256": "be9d679cc3eecc4261a5486b751ae497ac258d039cd818d85d23dccd76ed1faa"
+        },
+        {
+          "path": "protocol/bindings/ValidationAnomaly.ts",
+          "sha256": "59140da563e31b3f79ac9ccffa63c1cb446794b4c2445f68059b6c5a84840e43"
+        },
+        {
+          "path": "protocol/src/lib.rs",
+          "sha256": "8231ed3ecf818c7da7e294ddd27887c1f0c7802044beaafd33b1a1a4c886b96a"
+        },
+        {
+          "path": "protocol/src/package.rs",
+          "sha256": "6daa5ecfa3caacc974e43bdea60afdb3917d99c91c6346a5bb4244244a00191a"
+        },
+        {
+          "path": "rust-toolchain.toml",
+          "sha256": "b4ea3c94c934d96a2772b7878c12ccbf3e486313d0988a9c960e0bd87bafc8fe"
+        },
+        {
+          "path": "rustfmt.toml",
+          "sha256": "f8ff13feb40ec42a1338cfd1a58217273b56e562703cf16c1ad0bb59bde1b7e9"
+        },
+        {
+          "path": "server/gateway/Cargo.toml",
+          "sha256": "36af0bdf60f254a18ed8fd6fb384141e1fe914106d4e382d44b2fd405f71fc4a"
+        },
+        {
+          "path": "server/gateway/src/main.rs",
+          "sha256": "52db2ce1cd08344334b6e52f04e9365654374b632111e0f307b3b0adb9e3a43c"
+        },
+        {
+          "path": "tools/check.cjs",
+          "sha256": "e39a409c494eec8e398f5024a9b716badf60794746f8b4f6b4d9f999bf406e3f"
+        },
+        {
+          "path": "tools/check.test.cjs",
+          "sha256": "b55e48f3893111eac6a37c64e413fe62f2465f8a8d01ae6faae855244d9abd35"
+        }
+      ],
+      "after": [
+        {
+          "path": ".editorconfig",
+          "sha256": "9540382bb2e65edc589c6e9e965044465c52a6f4336398ed4dfcc622b3ec6ef1"
+        },
+        {
+          "path": ".gitattributes",
+          "sha256": "cfbcf2d11424f97f7ae6d6042a4ab66762db2fdc4ea567c1b8c2c722e07614f7"
+        },
+        {
+          "path": ".gitignore",
+          "sha256": "936e236f3cbfaf70b92919acd272f79635dd574bcd226139e33673820e30bc73"
+        },
+        {
+          "path": "AGENTS.md",
+          "sha256": "494a96425a8e6b6fb9106a85479f8aec64f69dd461a04f4db45ce3b73e10a4e8"
+        },
+        {
+          "path": "AGENTS_CN.md",
+          "sha256": "61324a819282d6f957986b6711bd0a146ff57ee9604572374f951dac86ffd7d3"
+        },
+        {
+          "path": "Cargo.lock",
+          "sha256": "a6d28f542b56dee90787b145eacd633955423991b9c247cbacf7df7a14ba819f"
+        },
+        {
+          "path": "Cargo.toml",
+          "sha256": "01aa1ccd342c6fae4f9062fd02ac60d465cbe292ec1bcd49ff1d1147e7fffaf7"
+        },
+        {
+          "path": "README.md",
+          "sha256": "043ca42c604d96f529d48c30d87e6b8f62e24b60f0363769b6663feeaab01d17"
+        },
+        {
+          "path": "README_CN.md",
+          "sha256": "1047ee9f26e29b43596962edff45682922a3c18a56008bf78cd0fbc6332408a4"
+        },
+        {
+          "path": "apps/windows/.npmrc",
+          "sha256": "c95f0d1fc57e8c33581b3e13bdbf174ac279874ae5a6c6d9822bdb933bcfb5b4"
+        },
+        {
+          "path": "apps/windows/index.html",
+          "sha256": "80b76eb17340f44b8bcdbbe3bf1267152593655d219c9495c941ad663aef8447"
+        },
+        {
+          "path": "apps/windows/native/Cargo.toml",
+          "sha256": "e92c00e4f9b82dad3f541bf5b5f8af5d07c2988ad618b69ff2911d2ee3c66dab"
+        },
+        {
+          "path": "apps/windows/native/build.rs",
+          "sha256": "dd942450408807b3ea93aae0a91f34f1efa58024eec07f0fa6c747f8810f8b32"
+        },
+        {
+          "path": "apps/windows/native/capabilities/default.json",
+          "sha256": "7a495826215b10029033565b8acae8cdaa2b08d762b45fc496d2eda7223ea6d4"
+        },
+        {
+          "path": "apps/windows/native/icons/128x128.png",
+          "sha256": "2e412a2c7c5378bc6bd7eb5b0e7e9f46e9027ceeb07d0bf1b26d563784a39024"
+        },
+        {
+          "path": "apps/windows/native/icons/128x128@2x.png",
+          "sha256": "9616fc5543d696cffd1e72e84d1fa2546277876728fece87c868259166afb48a"
+        },
+        {
+          "path": "apps/windows/native/icons/32x32.png",
+          "sha256": "7751b8efbd790b12f5ba5ce09e02f57f139c46663c3b380dbf5d9af2894ebcb3"
+        },
+        {
+          "path": "apps/windows/native/icons/icon.icns",
+          "sha256": "a1899f34c1a8333bc8d163b0b474d330fc3d0ac1ee306437f922dec10f455625"
+        },
+        {
+          "path": "apps/windows/native/icons/icon.ico",
+          "sha256": "00ff4cae1f6cba0e289a3f2978bb0b924168eea154e496705c7eb19a5edf83c0"
+        },
+        {
+          "path": "apps/windows/native/icons/icon.png",
+          "sha256": "2742237ba8fb48e7227dac3a17c99f7f35c1eae04db289f94c2c06aaad567bab"
+        },
+        {
+          "path": "apps/windows/native/icons/source.png",
+          "sha256": "a8c6bb08b9761950b07554bf820cb87fc06bc098010e9dd1066dcefb52256bcd"
+        },
+        {
+          "path": "apps/windows/native/src/database.rs",
+          "sha256": "3e1a38349d601463ead8f14b197c0eab41705f15c9c19da3f2d531f8171b2477"
+        },
+        {
+          "path": "apps/windows/native/src/ingestion.rs",
+          "sha256": "26b534af35342365b674d76b3f3f4036956a0924b62e7c61a4e027931c1ca26c"
+        },
+        {
+          "path": "apps/windows/native/src/lib.rs",
+          "sha256": "03836673b2d797677fc2ecba304af644010281fd3a3155db8dcdfa1d29ca8c42"
+        },
+        {
+          "path": "apps/windows/native/src/main.rs",
+          "sha256": "8b33ec1119d2771277ae37b11993aa68cdbd58e7912d7975cf31073eb562f6fb"
+        },
+        {
+          "path": "apps/windows/native/src/paths.rs",
+          "sha256": "cfef7c0b295560f4781a61f6553ae3313907625c25d203a8ac2d95af431bd530"
+        },
+        {
+          "path": "apps/windows/native/src/regression.rs",
+          "sha256": "a63b7044a2d22362683490509e276251cd3a08fe0593e8113f72ba8e78ebab4c"
+        },
+        {
+          "path": "apps/windows/native/src/review.rs",
+          "sha256": "a4fa3c4866622417263dc9c1f503e97e9fc6526ee3dbda8011f71e9d6a2addad"
+        },
+        {
+          "path": "apps/windows/native/src/storage.rs",
+          "sha256": "7bbea8e280ecf41d76985b58f99fed59bbb0ad1b82801ea63ea665f53120ee24"
+        },
+        {
+          "path": "apps/windows/native/tauri.conf.json",
+          "sha256": "1ea40771eac11e59737d248d74f81f0136d882ce65597d502d4904dbd8c23bb4"
+        },
+        {
+          "path": "apps/windows/package.json",
+          "sha256": "1cb1f68f924314b37d51d27ea835978f595cdf7ce5d30f9707f25e18675bb88e"
+        },
+        {
+          "path": "apps/windows/pnpm-lock.yaml",
+          "sha256": "25a13bbb14c7eddd6a5ded3332fd9b4723594d0f3afd88092638e1fc52a8935a"
+        },
+        {
+          "path": "apps/windows/pnpm-workspace.yaml",
+          "sha256": "ac02d96368617c760f093cfe61fdec64b6244007ab3553e0d6621f706f54a353"
+        },
+        {
+          "path": "apps/windows/public/favicon.ico",
+          "sha256": "00ff4cae1f6cba0e289a3f2978bb0b924168eea154e496705c7eb19a5edf83c0"
+        },
+        {
+          "path": "apps/windows/public/favicon.png",
+          "sha256": "1f69194ddf0a9ad6bd46b00a9253cc45d039020af44fe699c1ab4c8124672691"
+        },
+        {
+          "path": "apps/windows/public/logo.png",
+          "sha256": "2742237ba8fb48e7227dac3a17c99f7f35c1eae04db289f94c2c06aaad567bab"
+        },
+        {
+          "path": "apps/windows/src/App.vue",
+          "sha256": "18e24132a155fd924455d0253f6f332644b0b6fc0d090e6e2c2a3b960b166949"
+        },
+        {
+          "path": "apps/windows/src/components/Bar.vue",
+          "sha256": "6308f7a3b84fe04823b67c0e2b043de3995648565a9c8ed64a9bf08d3297ae21"
+        },
+        {
+          "path": "apps/windows/src/lifecycle.ts",
+          "sha256": "0218434fe779e418b6b3b90a3368fd70019b74c4d9e6e0cf9305241108828c03"
+        },
+        {
+          "path": "apps/windows/src/main.ts",
+          "sha256": "de8a34fe8ac5c4fa14a4f1c93351f4a8f88b07ce9adacd3c718fb86a5bb66e9e"
+        },
+        {
+          "path": "apps/windows/src/stores/library.ts",
+          "sha256": "ec4d9a7407c31a68b0169a65372e15943143e1e0173f5942221accd0f97d6db1"
+        },
+        {
+          "path": "apps/windows/src/style.css",
+          "sha256": "d60f0b0aca2db7c2843e10c960793580e7c14e53881fb66496966a5635492428"
+        },
+        {
+          "path": "apps/windows/src/text.ts",
+          "sha256": "4fffa888232e2de39cbde3035bdc2ea97e7d9257a795fddd16c01d812894cf85"
+        },
+        {
+          "path": "apps/windows/src/views/Audit.vue",
+          "sha256": "90cf8d0f768b8ef1c70dc79c33c827456258075d82b7d80a975f7288ad76e73e"
+        },
+        {
+          "path": "apps/windows/src/views/Profile.vue",
+          "sha256": "554b86ffc521e65850ada12badee5e3bb5f283318bfe97f503cc02697bbc780d"
+        },
+        {
+          "path": "apps/windows/src/views/Reader.vue",
+          "sha256": "c8b8e9c6076ddcbe38866827065aa93969ea82ac64a58cd4465a9dc429dac234"
+        },
+        {
+          "path": "apps/windows/src/views/Settings.vue",
+          "sha256": "bc08a5e14ab5dd57185bcbd8518c61a9cf08b6b7b8d36c2a692a7470060e6a2c"
+        },
+        {
+          "path": "apps/windows/src/views/Shelf.vue",
+          "sha256": "41b90d293558ac50f326fd079e873351d5b4f29bda88ca6ebda7dbb81a51082b"
+        },
+        {
+          "path": "apps/windows/tests/audit.cjs",
+          "sha256": "3ec0b47663af2fbbdd6dd6f1f9836d70a90755a94feec2574111d4aab8de73a3"
+        },
+        {
+          "path": "apps/windows/tests/import.cjs",
+          "sha256": "cfa78690e4e9fb85c1c435ff425f51274a60bd4532a84cb46221bd2b359dc09e"
+        },
+        {
+          "path": "apps/windows/tests/library.cjs",
+          "sha256": "d6556e8521b038cc7823c426d3858db7635ee2f75af05c42e63cd7b6af385d7f"
+        },
+        {
+          "path": "apps/windows/tests/lifecycle.cjs",
+          "sha256": "1cf732b4fde63364fb3d1aa0c422222cce8c7454a09d5363677c2c00707d8fd4"
+        },
+        {
+          "path": "apps/windows/tests/persistence.cjs",
+          "sha256": "492ef2dcc3f30b3f656bcdeecbd763c5c01611f7b73dd0cf5cd6e1718c644ef8"
+        },
+        {
+          "path": "apps/windows/tests/reader.cjs",
+          "sha256": "bd18067da4abf4d103a1d45dcba50284a1b80e2ff0579feb3d3fd35c16f156de"
+        },
+        {
+          "path": "apps/windows/tests/regression.cjs",
+          "sha256": "635ce98558650cdf2041a1f30662035b7fc999150fde724295a3183b844aa13a"
+        },
+        {
+          "path": "apps/windows/tests/support/loader.cjs",
+          "sha256": "d3570547d4daa9ca4a30b04be58e5931a07e4b320ffc70c91e65b8f437fbd77a"
+        },
+        {
+          "path": "apps/windows/tools/style.cjs",
+          "sha256": "575a7ffc3613499387657cc1b9e9414187627e6021eb2c81c56f4b614dbcedb0"
+        },
+        {
+          "path": "apps/windows/tsconfig.json",
+          "sha256": "464de2370810ebcbf405b0c64773f6147495a821846ff83170fc7d4c0e1875cf"
+        },
+        {
+          "path": "apps/windows/vite.config.ts",
+          "sha256": "ee5ef5259844fd021907f6b7dc0675a871591adc217a103ccffd77fc10c685cb"
+        },
+        {
+          "path": "development.json",
+          "sha256": "9b4b09caec909a23dcc7096056aef0d561ae5be0e71bd9fdaa9dc205e2ada4ab"
+        },
+        {
+          "path": "docs/architecture.md",
+          "sha256": "d117d977ebd2baf4df80f6aa73d433609e10f9781b33ec6b1098a3ef379233a5"
+        },
+        {
+          "path": "docs/architecture_CN.md",
+          "sha256": "a92c84db2df2ee230377323985556720ec5653781325aa10de0872355e845399"
+        },
+        {
+          "path": "docs/chronicle/.gitkeep",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "docs/chronicle/2026-10-19-worklog.json",
+          "sha256": "ac0d9ba01a6f16445d73ac66f1d47df5245d95fa46ce6a9cb344af051a2c7fc7"
+        },
+        {
+          "path": "docs/chronicle/2026-10-19-worklog.md",
+          "sha256": "1eccc1c0d182bd54ff26412cb831d3802d3a2a66f96b6825924dbde1fca83ffc"
+        },
+        {
+          "path": "docs/chronicle/2026-10-19-worklog_CN.md",
+          "sha256": "4b83408f501eba33c05cad5dcc7dbb07a48f4e9f2f289a810cd60abc5773776e"
+        },
+        {
+          "path": "docs/coding.md",
+          "sha256": "6bed790a36506c51c4e535b23ca6fa047668244b082f8a8620ba458e3d29896b"
+        },
+        {
+          "path": "docs/coding_CN.md",
+          "sha256": "8a699d09544236085a3adf152908059e6c9b1fc03125bc0418ae239a037fc173"
+        },
+        {
+          "path": "docs/development.md",
+          "sha256": "62b9bc5b99cabdb480ef960a0be7ed454bfe25c7b878ef8e8e7b9318393f8247"
+        },
+        {
+          "path": "docs/development_CN.md",
+          "sha256": "7bfd0a492a06db200fc48ff61929957580770c5de38ca645356b01bc2e040004"
+        },
+        {
+          "path": "docs/documentation.md",
+          "sha256": "93179de59bef3174ff5059c32116dc9efdf59bec67404d2854e04b5556009a0c"
+        },
+        {
+          "path": "docs/documentation_CN.md",
+          "sha256": "92a342eabd0ebeb60319efdd38da30e774d8c17c8dbf69337acf945100622625"
+        },
+        {
+          "path": "docs/maintenance.md",
+          "sha256": "a11a92e33862306d0e05b543611dc34e5ebf08bd84c4da4a87c0c6cf10cb3603"
+        },
+        {
+          "path": "docs/maintenance_CN.md",
+          "sha256": "630e0f72b31381398e10aa58e18204d0ff3206fc6f55e9696f1f06b33b076d13"
+        },
+        {
+          "path": "docs/proposals.md",
+          "sha256": "0144b55f3880b5dfa771bf1079c7852fdb50c4c0dc70d994d882452acad84245"
+        },
+        {
+          "path": "docs/proposals_CN.md",
+          "sha256": "78eee5420745bb1ccf5804971516d9970d66276a68e29fe0fb25a15be28c593d"
+        },
+        {
+          "path": "docs/segmentation.md",
+          "sha256": "403df6b272f8c1b8557248d47c83d0c86b43881c1a62e5b4d0ac7cdc75e3b8fa"
+        },
+        {
+          "path": "docs/segmentation_CN.md",
+          "sha256": "fa74ab74039802001c95c98131584936e3e16cc498dc4214366540304736b001"
+        },
+        {
+          "path": "docs/selection.md",
+          "sha256": "5cb47d45849927ad7698d3d65fd62ad672e1a0e92b5bf418e8477af58d062a68"
+        },
+        {
+          "path": "docs/selection_CN.md",
+          "sha256": "e02742db7bb978b29bf58de2f87e493c244b6fa922c17106b77cdad2348fef6b"
+        },
+        {
+          "path": "docs/style.md",
+          "sha256": "02487b5d11aabd612e68b8a1e05374e3808af253caf88a3ab90955a87df29753"
+        },
+        {
+          "path": "docs/style_CN.md",
+          "sha256": "5f8df23cb21c608a6e82c2a7e4062c044e4367c901b5e6b79f1c1582f258d32e"
+        },
+        {
+          "path": "docs/tasks.md",
+          "sha256": "cc7a1158dc0801ee206bd63b83c64e9294315c903f76c051609520eeb853d0ea"
+        },
+        {
+          "path": "docs/tasks_CN.md",
+          "sha256": "d330d6fc25c7c475fcae4d8ee18de132a4e8a1c25c165b9d6d5a974fe86ca8ff"
+        },
+        {
+          "path": "docs/worklog.md",
+          "sha256": "6b9c71aabcc6a73ef053e00e921a8cb90207ef24c564a3d83c37c7f7cb99a1ec"
+        },
+        {
+          "path": "docs/worklog_CN.md",
+          "sha256": "96ac056d06c1b30315fc3ec8fdc2c8a1044ccbb353bd509812335938bbc60ef8"
+        },
+        {
+          "path": "packages/reader/Cargo.toml",
+          "sha256": "400ed35b27c7c9a09f2f24ce8f383371454b735fcfed83c203e69eeda3eb4111"
+        },
+        {
+          "path": "packages/reader/src/heading.rs",
+          "sha256": "067d25babc0e4af73c9a020be6ff6feac41017936a2f27fa24eacfd4c1f4706c"
+        },
+        {
+          "path": "packages/reader/src/lib.rs",
+          "sha256": "af8755d4a9c77aad7877231c5d747ab79b482d6f53141f04663bc016a5b400d3"
+        },
+        {
+          "path": "packages/reader/src/validator.rs",
+          "sha256": "0d09ba1c6d1a8df2be407bcb64b1ce95179eac9498ba70636acb49e72b09f735"
+        },
+        {
+          "path": "packages/reader/tests/segmentation.rs",
+          "sha256": "a3a757784d723c4983dfc9e8c6c002d31bbd9b0bb9cb97443f2ac31ea8643207"
+        },
+        {
+          "path": "protocol/Cargo.toml",
+          "sha256": "1793ec8020ec412cf3d7e1873e1e91e1ae998a5a0049e978d38c31d8c2dfb32e"
+        },
+        {
+          "path": "protocol/bindings/AnomalyType.ts",
+          "sha256": "6f44a2672b1150eb6917ae4942efbb464bae652996741c6e0a8ed7d60cd56f0f"
+        },
+        {
+          "path": "protocol/bindings/Book.ts",
+          "sha256": "59ac00539b8fa5b0905382b3dacd41f8e1807937a84e16886b9e91d8afc36af5"
+        },
+        {
+          "path": "protocol/bindings/BookSummary.ts",
+          "sha256": "2a84129383c71da73e8212472942b611b2e0dcd330ae5afce525c7cd82ac14b8"
+        },
+        {
+          "path": "protocol/bindings/Chapter.ts",
+          "sha256": "a7a7e010fd6cb561e158abb0ad6093d1268ccc074b817ef8ae9f4c4b0447c6fe"
+        },
+        {
+          "path": "protocol/bindings/Chunk.ts",
+          "sha256": "cdb38d070f1b3c3310360006ea3c6903edc5fa59ace788c04e0d9bc07ac8f8ca"
+        },
+        {
+          "path": "protocol/bindings/ImportProgress.ts",
+          "sha256": "63b8b77296e596a166d16672483cf5ecb39b6c0debf5837c8719f1bf4c16d4f6"
+        },
+        {
+          "path": "protocol/bindings/Manifest.ts",
+          "sha256": "e3eebc726bd13b5acbe03a83fb5d61e71f7120f8e6cf94b61497e48e61f32311"
+        },
+        {
+          "path": "protocol/bindings/Novel.ts",
+          "sha256": "422a6e26bc7bb5a45d7aa8ec61a0bb261e044710c67b02530f11dd961da55144"
+        },
+        {
+          "path": "protocol/bindings/NovelImportResult.ts",
+          "sha256": "7c057ce6bc42b080a322e42d35aac8a545ac85688d9a2fc4a7e5a7a608adfc22"
+        },
+        {
+          "path": "protocol/bindings/NovelValidation.ts",
+          "sha256": "488a48bcf891723ad822c697a25db5f28c52bbb51dea4a31f00f302dc3fb6101"
+        },
+        {
+          "path": "protocol/bindings/Section.ts",
+          "sha256": "4ed5a9fe563ecf8ad24cd5a1bd702c7c2a4bd768ca1b78942ad69ae1dd093ccf"
+        },
+        {
+          "path": "protocol/bindings/Span.ts",
+          "sha256": "be9d679cc3eecc4261a5486b751ae497ac258d039cd818d85d23dccd76ed1faa"
+        },
+        {
+          "path": "protocol/bindings/ValidationAnomaly.ts",
+          "sha256": "59140da563e31b3f79ac9ccffa63c1cb446794b4c2445f68059b6c5a84840e43"
+        },
+        {
+          "path": "protocol/src/lib.rs",
+          "sha256": "8231ed3ecf818c7da7e294ddd27887c1f0c7802044beaafd33b1a1a4c886b96a"
+        },
+        {
+          "path": "protocol/src/package.rs",
+          "sha256": "6daa5ecfa3caacc974e43bdea60afdb3917d99c91c6346a5bb4244244a00191a"
+        },
+        {
+          "path": "rust-toolchain.toml",
+          "sha256": "b4ea3c94c934d96a2772b7878c12ccbf3e486313d0988a9c960e0bd87bafc8fe"
+        },
+        {
+          "path": "rustfmt.toml",
+          "sha256": "f8ff13feb40ec42a1338cfd1a58217273b56e562703cf16c1ad0bb59bde1b7e9"
+        },
+        {
+          "path": "server/gateway/Cargo.toml",
+          "sha256": "36af0bdf60f254a18ed8fd6fb384141e1fe914106d4e382d44b2fd405f71fc4a"
+        },
+        {
+          "path": "server/gateway/src/main.rs",
+          "sha256": "52db2ce1cd08344334b6e52f04e9365654374b632111e0f307b3b0adb9e3a43c"
+        },
+        {
+          "path": "tools/check.cjs",
+          "sha256": "e39a409c494eec8e398f5024a9b716badf60794746f8b4f6b4d9f999bf406e3f"
+        },
+        {
+          "path": "tools/check.test.cjs",
+          "sha256": "b55e48f3893111eac6a37c64e413fe62f2465f8a8d01ae6faae855244d9abd35"
+        }
+      ],
+      "unchanged": true,
+      "checks": [
+        {
+          "id": "runner",
+          "program": "node",
+          "cwd": ".",
+          "args": [
+            "--test",
+            "tools/check.test.cjs"
+          ],
+          "timeoutMs": 30000,
+          "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\15140_1792747042762\\node.exe",
+          "arguments": [
+            "--test",
+            "tools/check.test.cjs"
+          ],
+          "started": "2026-10-23T11:41:40.039Z",
+          "finished": "2026-10-23T11:41:40.560Z",
+          "exitCode": 0,
+          "signal": null,
+          "termination": "exited",
+          "error": null,
+          "bytes": 306,
+          "passed": true,
+          "log": "runner.log",
+          "sha256": "3f2392b84a23c336968356f5fcb19c21f05e0c4f53f04f568c9d214742789d3a"
+        },
+        {
+          "id": "format",
+          "program": "cargo",
+          "cwd": ".",
+          "args": [
+            "fmt",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "timeoutMs": 30000,
+          "command": "rustup",
+          "arguments": [
+            "run",
+            "1.98.0",
+            "cargo",
+            "fmt",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "started": "2026-10-23T11:41:40.562Z",
+          "finished": "2026-10-23T11:41:40.735Z",
+          "exitCode": 0,
+          "signal": null,
+          "termination": "exited",
+          "error": null,
+          "bytes": 0,
+          "passed": true,
+          "log": "format.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "id": "clippy",
+          "program": "cargo",
+          "cwd": ".",
+          "args": [
+            "clippy",
+            "--offline",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "timeoutMs": 180000,
+          "command": "rustup",
+          "arguments": [
+            "run",
+            "1.98.0",
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "started": "2026-10-23T11:41:40.735Z",
+          "finished": "2026-10-23T11:41:42.748Z",
+          "exitCode": 0,
+          "signal": null,
+          "termination": "exited",
+          "error": null,
+          "bytes": 137,
+          "passed": true,
+          "log": "clippy.log",
+          "sha256": "dcf7f61611263f23b47a5de5a49032ac457f357835ef56005178bcfbeb8a3a1d"
+        },
+        {
+          "id": "rust",
+          "program": "cargo",
+          "cwd": ".",
+          "args": [
+            "test",
+            "--offline",
+            "--locked",
+            "--workspace"
+          ],
+          "timeoutMs": 180000,
+          "command": "rustup",
+          "arguments": [
+            "run",
+            "1.98.0",
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "--workspace"
+          ],
+          "started": "2026-10-23T11:41:42.749Z",
+          "finished": "2026-10-23T11:41:54.394Z",
+          "exitCode": 0,
+          "signal": null,
+          "termination": "exited",
+          "error": null,
+          "bytes": 7956,
+          "passed": true,
+          "log": "rust.log",
+          "sha256": "019b887119e148059772c9a637cdd878f83b90195f565657d4132052680a13fe"
+        },
+        {
+          "id": "style",
+          "program": "node",
+          "cwd": "apps/windows",
+          "args": [
+            "tools/style.cjs"
+          ],
+          "timeoutMs": 30000,
+          "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\15140_1792747042762\\node.exe",
+          "arguments": [
+            "tools/style.cjs"
+          ],
+          "started": "2026-10-23T11:41:54.394Z",
+          "finished": "2026-10-23T11:41:54.672Z",
+          "exitCode": 0,
+          "signal": null,
+          "termination": "exited",
+          "error": null,
+          "bytes": 68,
+          "passed": true,
+          "log": "style.log",
+          "sha256": "c57bd349e513259ba4751b7116f3ddf52618c66895e4867984e214ee8ba2536e"
+        },
+        {
+          "id": "frontend",
+          "program": "node",
+          "cwd": "apps/windows",
+          "args": [
+            "--test",
+            "tests/*.cjs"
+          ],
+          "timeoutMs": 30000,
+          "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\15140_1792747042762\\node.exe",
+          "arguments": [
+            "--test",
+            "tests/*.cjs"
+          ],
+          "started": "2026-10-23T11:41:54.672Z",
+          "finished": "2026-10-23T11:41:55.581Z",
+          "exitCode": 0,
+          "signal": null,
+          "termination": "exited",
+          "error": null,
+          "bytes": 6220,
+          "passed": true,
+          "log": "frontend.log",
+          "sha256": "f598baf034cce60c2540dfc3ec7d1d35b0135a349b4163366d65482597783453"
+        },
+        {
+          "id": "types",
+          "program": "node",
+          "cwd": "apps/windows",
+          "args": [
+            "node_modules/vue-tsc/bin/vue-tsc.js",
+            "--noEmit"
+          ],
+          "timeoutMs": 30000,
+          "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\15140_1792747042762\\node.exe",
+          "arguments": [
+            "node_modules/vue-tsc/bin/vue-tsc.js",
+            "--noEmit"
+          ],
+          "started": "2026-10-23T11:41:55.584Z",
+          "finished": "2026-10-23T11:41:56.662Z",
+          "exitCode": 0,
+          "signal": null,
+          "termination": "exited",
+          "error": null,
+          "bytes": 0,
+          "passed": true,
+          "log": "types.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "id": "build",
+          "program": "node",
+          "cwd": "apps/windows",
+          "args": [
+            "node_modules/vite/bin/vite.js",
+            "build"
+          ],
+          "timeoutMs": 30000,
+          "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\15140_1792747042762\\node.exe",
+          "arguments": [
+            "node_modules/vite/bin/vite.js",
+            "build"
+          ],
+          "started": "2026-10-23T11:41:56.662Z",
+          "finished": "2026-10-23T11:41:57.650Z",
+          "exitCode": 0,
+          "signal": null,
+          "termination": "exited",
+          "error": null,
+          "bytes": 977,
+          "passed": true,
+          "log": "build.log",
+          "sha256": "0c6c577f66069e9ee16495ca40c24224710dfcec5e99a1fbdacac026c04dbe9d"
+        }
+      ],
+      "passed": true,
+      "trust": "local-unsealed"
+    }
+  },
+  "performance": {
+    "scope": "Isolated implemented storage-call path; excludes Tauri IPC, UI rendering, complete application startup, mobile energy and cold-cache behavior.",
+    "environment": {
+      "platform": "win32",
+      "release": "10.0.26100",
+      "architecture": "x64",
+      "cpu": "13th Gen Intel(R) Core(TM) i7-13700F",
+      "sqlite": "3.46.0"
+    },
+    "method": "Both paths use 1000 synthetic book rows and WAL synchronous=NORMAL. Three trials alternate method order. Each trial updates one active book 3000 times. Baseline compiles the pre-change storage source from the retained snapshot; implemented compiles the current Database::execute plus storage::update_progress, including mutex, input validation and cached statement. Batch totals include automatic checkpoints and explicitly account for final checkpoint/close. Every case verifies the final anchor after closing/reopening.",
+    "execution": {
+      "start": "2026-10-23T11:37:59.858Z",
+      "end": "2026-10-23T11:38:44.498Z",
+      "status": 0,
+      "signal": null,
+      "inputs": [
+        {
+          "path": "apps/windows/native/src/database.rs",
+          "sha256": "3e1a38349d601463ead8f14b197c0eab41705f15c9c19da3f2d531f8171b2477"
+        },
+        {
+          "path": "apps/windows/native/src/storage.rs",
+          "sha256": "7bbea8e280ecf41d76985b58f99fed59bbb0ad1b82801ea63ea665f53120ee24"
+        },
+        {
+          "path": "apps/windows/native/src/review.rs",
+          "sha256": "a4fa3c4866622417263dc9c1f503e97e9fc6526ee3dbda8011f71e9d6a2addad"
+        }
+      ],
+      "unchanged": true
+    },
+    "summary": [
+      {
+        "mode": "baseline-reopen",
+        "trials": 3,
+        "updates": 9000,
+        "medianUs": 4786.3,
+        "p95Us": 5603.7,
+        "maximumUs": 40476.2,
+        "amortizedUsIncludingFinalCheckpoint": 4926.594444444445
+      },
+      {
+        "mode": "implemented-resident",
+        "trials": 3,
+        "updates": 9000,
+        "medianUs": 9.4,
+        "p95Us": 13.8,
+        "maximumUs": 7217.2,
+        "amortizedUsIncludingFinalCheckpoint": 15.114511111111112
+      }
+    ],
+    "trials": [
+      {
+        "amortizedUsIncludingFinalCheckpoint": 4902.9204,
+        "automaticCheckpointPages": 1000,
+        "batchUs": 14708761.2,
+        "books": 1000,
+        "finalCheckpointAndCloseUs": 0,
+        "maximumUs": 27702.899999999998,
+        "medianUs": 4781.1,
+        "mode": "baseline-reopen",
+        "p95Us": 5536.6,
+        "sqlite": "3.46.0",
+        "trial": 0,
+        "updates": 3000,
+        "verifiedAfterClose": true,
+        "wal": "NORMAL"
+      },
+      {
+        "amortizedUsIncludingFinalCheckpoint": 14.490433333333334,
+        "automaticCheckpointPages": 1000,
+        "batchUs": 42804.700000000004,
+        "books": 1000,
+        "finalCheckpointAndCloseUs": 666.6,
+        "maximumUs": 2927.9,
+        "medianUs": 9.4,
+        "mode": "implemented-resident",
+        "p95Us": 13.9,
+        "sqlite": "3.46.0",
+        "trial": 0,
+        "updates": 3000,
+        "verifiedAfterClose": true,
+        "wal": "NORMAL"
+      },
+      {
+        "amortizedUsIncludingFinalCheckpoint": 14.9074,
+        "automaticCheckpointPages": 1000,
+        "batchUs": 43862.8,
+        "books": 1000,
+        "finalCheckpointAndCloseUs": 859.4,
+        "maximumUs": 3088.3999999999996,
+        "medianUs": 9.3,
+        "mode": "implemented-resident",
+        "p95Us": 18.2,
+        "sqlite": "3.46.0",
+        "trial": 1,
+        "updates": 3000,
+        "verifiedAfterClose": true,
+        "wal": "NORMAL"
+      },
+      {
+        "amortizedUsIncludingFinalCheckpoint": 4958.3247,
+        "automaticCheckpointPages": 1000,
+        "batchUs": 14874974.1,
+        "books": 1000,
+        "finalCheckpointAndCloseUs": 0,
+        "maximumUs": 40476.2,
+        "medianUs": 4779.900000000001,
+        "mode": "baseline-reopen",
+        "p95Us": 5798.700000000001,
+        "sqlite": "3.46.0",
+        "trial": 1,
+        "updates": 3000,
+        "verifiedAfterClose": true,
+        "wal": "NORMAL"
+      },
+      {
+        "amortizedUsIncludingFinalCheckpoint": 4918.538233333334,
+        "automaticCheckpointPages": 1000,
+        "batchUs": 14755614.700000001,
+        "books": 1000,
+        "finalCheckpointAndCloseUs": 0,
+        "maximumUs": 33386.8,
+        "medianUs": 4800.2,
+        "mode": "baseline-reopen",
+        "p95Us": 5540.599999999999,
+        "sqlite": "3.46.0",
+        "trial": 2,
+        "updates": 3000,
+        "verifiedAfterClose": true,
+        "wal": "NORMAL"
+      },
+      {
+        "amortizedUsIncludingFinalCheckpoint": 15.945699999999999,
+        "automaticCheckpointPages": 1000,
+        "batchUs": 47098.1,
+        "books": 1000,
+        "finalCheckpointAndCloseUs": 739,
+        "maximumUs": 7217.2,
+        "medianUs": 9.3,
+        "mode": "implemented-resident",
+        "p95Us": 12.5,
+        "sqlite": "3.46.0",
+        "trial": 2,
+        "updates": 3000,
+        "verifiedAfterClose": true,
+        "wal": "NORMAL"
+      }
+    ],
+    "limits": [
+      "Shared Windows host, warm synthetic data and reused dependency artifacts; this is local diagnostic evidence, not a qualified performance budget.",
+      "The harness leaves the engine default automatic checkpoint threshold unchanged; it is not a separate measurement of checkpoint scheduling.",
+      "No claim of equivalent power-loss persistence, mobile battery savings or full application speedup."
+    ]
+  },
+  "limits": [
+    "Real desktop event delivery, normal-close UI interaction and native save-dialog interaction remain untested.",
+    "Forced process termination, operating-system shutdown and power loss are not covered by close hooks; SQLite WAL/NORMAL durability semantics are unchanged.",
+    "Timer throttling, process suspension, busy storage and long archive operations can delay saving beyond the selected scheduling interval.",
+    "Existing .saga/catalog ordinary-failure rollback remains distinct from cross-resource crash recovery.",
+    "The host blocking-worker admission queue and end-to-end memory/latency are not bounded by this change.",
+    "Release qualification remains GAP-04; no commit, push, application start or live migration was performed."
+  ],
+  "diagnostics": {
+    "root": "C:/Users/Ethan/AppData/Local/Temp/saga-resident-20261023-wwTe3U",
+    "runnerDirectory": "docs/evidence/2026-10-23T11-41-39-987Z-c5e65bf4",
+    "retainedLocalOnly": true,
+    "files": [
+      {
+        "path": "C:\\Users\\Ethan\\AppData\\Local\\Temp\\saga-resident-20261023-wwTe3U\\baseline.json",
+        "sha256": "720f01378558b37aa260026b504caa4b70571795f8dc42991b2497ea38941a1c"
+      },
+      {
+        "path": "C:\\Users\\Ethan\\AppData\\Local\\Temp\\saga-resident-20261023-wwTe3U\\native-first.log",
+        "sha256": "b3c37281485eacaf69d8bae1c81a0ef651e64599a5aad54d4113c4b5e8b9e73b"
+      },
+      {
+        "path": "C:\\Users\\Ethan\\AppData\\Local\\Temp\\saga-resident-20261023-wwTe3U\\frontend-first.log",
+        "sha256": "53b689702f49f8364c5df5cbdaae121f3fe594b2b1cc7f8f7cc1d7b5bc45717e"
+      },
+      {
+        "path": "C:\\Users\\Ethan\\AppData\\Local\\Temp\\saga-resident-20261023-wwTe3U\\types-first.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "C:\\Users\\Ethan\\AppData\\Local\\Temp\\saga-resident-20261023-wwTe3U\\benchmark.rs",
+        "sha256": "37b8ab6c6b6b1834f7ba24fffade3f94bfc54004e10431c463fec934b648331e"
+      },
+      {
+        "path": "C:\\Users\\Ethan\\AppData\\Local\\Temp\\saga-resident-20261023-wwTe3U\\benchmark-compile-args.json",
+        "sha256": "03086e10b4d5a4e72e1575e3a7640c39ee43d3ebcdafe41dd4b44a55cc60cdc9"
+      },
+      {
+        "path": "C:\\Users\\Ethan\\AppData\\Local\\Temp\\saga-resident-20261023-wwTe3U\\benchmark-compile.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "C:\\Users\\Ethan\\AppData\\Local\\Temp\\saga-resident-20261023-wwTe3U\\benchmark-execution.json",
+        "sha256": "09b273fff19aeffdf3b12732e86c6f7afdadd53ca7ea31ce93a77c498eb2fe58"
+      },
+      {
+        "path": "C:\\Users\\Ethan\\AppData\\Local\\Temp\\saga-resident-20261023-wwTe3U\\benchmark.log",
+        "sha256": "1a34d32008a52d43f70bb39f490938e31764df5eef8849952333dd7a00b8cda5"
+      },
+      {
+        "path": "C:\\Users\\Ethan\\AppData\\Local\\Temp\\saga-resident-20261023-wwTe3U\\benchmark\\measurements.json",
+        "sha256": "35bb083e01f5749b0374cf1584a492756422c71555ec9d358d309e0840bf94ec"
+      },
+      {
+        "path": "C:\\Users\\Ethan\\AppData\\Local\\Temp\\saga-resident-20261023-wwTe3U\\collect-first.log",
+        "sha256": "2a477407542c49e12d347f0caf9e63f3d3dda9df0526d2527ad57b4d4a64885c"
+      }
+    ],
+    "runnerReceiptSha256": "6297a32ef33da988dab15026b5ddf1bd70282a4796d2c332caca72b84026a5b9"
+  }
+}

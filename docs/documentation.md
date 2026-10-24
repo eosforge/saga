@@ -18,6 +18,7 @@ Keep only README and AGENTS document pairs at the root. Detailed documents belon
 | style.md | Project coding differences and tool configuration |
 | maintenance.md | Local workflow, failure guarantees, verification scope, and evidence limits |
 | segmentation.md | TXT chapter recognition and retained review decisions |
+| speech.md | Local narration constraints, portable deployment audit, and pending host verification |
 | selection.md | Historical technology selection and its assumptions |
 | proposals.md | Designs pending review |
 | evidence/ | Selected, cited verification receipts and results |

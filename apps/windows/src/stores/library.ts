@@ -46,16 +46,17 @@ export const activeAuditNovel = ref<Novel | null>(null);
 export const isGlobalBusy = ref(false);
 
 const STORED_BANNER_KEY = "saga_shelf_show_hero_banner";
-export const showHeroBanner = ref<boolean>(
-  typeof localStorage !== "undefined"
-    ? localStorage.getItem(STORED_BANNER_KEY) !== "false"
-    : true
-);
+/** Read optional UI preferences without preventing the reader from opening when webview storage is unavailable. */
+function stored(key: string): string | undefined {
+  try { return typeof localStorage === "undefined" ? undefined : localStorage.getItem(key) ?? undefined; }
+  catch { return undefined; }
+}
+
+export const showHeroBanner = ref<boolean>(stored(STORED_BANNER_KEY) !== "false");
 
 watch(showHeroBanner, (val) => {
-  if (typeof localStorage !== "undefined") {
-    localStorage.setItem(STORED_BANNER_KEY, String(val));
-  }
+  try { if (typeof localStorage !== "undefined") localStorage.setItem(STORED_BANNER_KEY, String(val)); }
+  catch (error) { failure.value = "横幅设置未能记住：" + error; }
 });
 
 /** Selected catalog entry, with an initial first-book fallback. */
@@ -192,6 +193,7 @@ export function prevChapter(): void {
 /** Publish a persisted native import or an explicitly transient preview. */
 export function importNovel(novel: Novel, format: "TXT" | "SAGA" = "TXT"): BookItem {
   pause();
+  acknowledged.delete(novel.book.id);
   const previous = books.value.find(item => item.id === novel.book.id);
   const book: BookItem = {
     ...novel.book, format, progress: 0, lastRead: isTauri() ? "本地导入" : "浏览器临时预览",
@@ -234,6 +236,8 @@ export async function deleteBook(id: string): Promise<void> {
     if (progressWrite) await progressWrite.catch(() => { });
     if (isTauri()) await invoke("delete_novel", { id });
     pendingProgress.delete(id);
+    acknowledged.delete(id);
+    if (pendingProgress.size === 0) cancel();
     revise(id);
     books.value = books.value.filter((book) => book.id !== id);
     if (activeBookId.value === id) {
@@ -247,6 +251,7 @@ export async function deleteBook(id: string): Promise<void> {
     }
   } finally {
     deleting.delete(id);
+    if (pendingProgress.has(id)) schedule();
   }
 }
 
@@ -290,6 +295,7 @@ export async function saveAuditedSections(bookId: string, sections: Section[], r
     target.sections = markRaw(snapshot);
     target.chapters = snapshot.length;
     project(target, target.currentChapterIndex);
+    acknowledged.delete(bookId);
   }
   return report;
 }
@@ -336,6 +342,19 @@ export async function loadStoredNovels(): Promise<void> {
   }
 }
 
+/** Allowed maximum automatic-save waits in seconds; desktop lifecycle events save earlier. */
+export const saveIntervals = [5, 10, 15, 30, 60] as const;
+const intervalKey = "saga_progress_interval";
+
+/** Read an existing UI preference; missing, inaccessible, or unsupported values use 30 seconds. */
+function preference(): number {
+  const value = Number(stored(intervalKey));
+  return saveIntervals.some(interval => interval === value) ? value : 30;
+}
+
+export const saveInterval = ref(preference());
+/** Monotonic start of the dirty batch; changes to the preference preserve elapsed time. */
+let started: number | undefined;
 let progressSaveTimer: ReturnType<typeof setTimeout> | null = null;
 /** Latest unsaved anchor for one book; ratios are finite and within [0, 1]. */
 interface Position {
@@ -345,15 +364,57 @@ interface Position {
   scrollRatio: number;
 }
 const pendingProgress = new Map<string, Position>();
+/** Successful anchors for this session; a changed book invalidates its acknowledgement. */
+const acknowledged = new Map<string, Position>();
 let progressWrite: Promise<void> | null = null;
 let writing: Position | null = null;
 
+/** Compare only the persisted anchor, including sub-paragraph scroll movement. */
+function equal(left: Position | undefined | null, right: Position): boolean {
+  return left?.bookId === right.bookId && left.chapterIndex === right.chapterIndex
+    && left.paragraphIndex === right.paragraphIndex && left.scrollRatio === right.scrollRatio;
+}
+
+/** Release the owned timer when an explicit flush or a clean queue supersedes it. */
+function cancel(): void {
+  if (progressSaveTimer !== null) clearTimeout(progressSaveTimer);
+  progressSaveTimer = null;
+  if (pendingProgress.size === 0) started = undefined;
+}
+
+/** Persist an allowed UI preference and apply its remaining delay to an already dirty batch. */
+export function configureSaving(seconds: number): void {
+  if (!saveIntervals.some(interval => interval === seconds)) return;
+  saveInterval.value = seconds;
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem(intervalKey, String(seconds));
+    if (failure.value.startsWith("自动保存设置未能记住：")) failure.value = "";
+  } catch (error) {
+    failure.value = "自动保存设置未能记住：" + error + "；本次会话仍按所选间隔保存";
+  }
+  cancel();
+  schedule();
+}
+
+/** Start one non-resetting deadline; failures remain available for a later explicit retry. */
+function schedule(): void {
+  if (progressSaveTimer !== null || pendingProgress.size === 0) return;
+  if (typeof setTimeout === "undefined") {
+    void flushReadingProgress().catch(() => { });
+    return;
+  }
+  const now = typeof performance === "undefined" ? Date.now() : performance.now();
+  started ??= now;
+  progressSaveTimer = setTimeout(() => {
+    progressSaveTimer = null;
+    void flushReadingProgress().catch(() => { });
+  }, Math.max(0, saveInterval.value * 1000 - (now - started)));
+}
+
 /** Drain queued positions in order, sharing the active write and retaining failed positions for retry. */
 export async function flushReadingProgress(): Promise<void> {
-  if (progressSaveTimer !== null) {
-    clearTimeout(progressSaveTimer);
-    progressSaveTimer = null;
-  }
+  cancel();
+  started = undefined;
   if (!isTauri()) return;
   if (progressWrite) {
     await progressWrite;
@@ -369,8 +430,11 @@ export async function flushReadingProgress(): Promise<void> {
       writing = payload;
       try {
         await invoke("update_reading_progress", { ...payload });
-        if (failure.value.startsWith("保存阅读进度失败：")) failure.value = "";
+        acknowledged.set(payload.bookId, payload);
+        if (failure.value.startsWith("保存阅读进度失败：") || failure.value.startsWith("关闭前保存失败：")) failure.value = "";
       } catch (error) {
+        // A failed IPC response may follow a committed native write; the previous acknowledgement is no longer authoritative.
+        acknowledged.delete(payload.bookId);
         if (books.value.some(book => book.id === payload.bookId) && !pendingProgress.has(payload.bookId)) {
           pendingProgress.set(payload.bookId, payload);
         }
@@ -385,10 +449,11 @@ export async function flushReadingProgress(): Promise<void> {
   try { await operation; }
   finally {
     if (progressWrite === operation) progressWrite = null;
+    if (pendingProgress.size === 0) cancel();
   }
 }
 
-/** Updates in-memory position and debounces persistent write to SQLite. */
+/** Update memory immediately and coalesce changed anchors within the fixed save interval. */
 export function saveReadingProgress(
   bookId: string,
   chapterIndex: number,
@@ -411,15 +476,13 @@ export function saveReadingProgress(
     target.currentChapter = sec.title;
   }
   if (!isTauri()) return;
-  pendingProgress.set(bookId, { bookId, chapterIndex, paragraphIndex, scrollRatio });
-  if (typeof setTimeout !== "undefined") {
-    if (progressSaveTimer !== null) {
-      clearTimeout(progressSaveTimer);
-    }
-    progressSaveTimer = setTimeout(() => {
-      void flushReadingProgress().catch(() => { });
-    }, 300);
-  } else {
-    void flushReadingProgress().catch(() => { });
+  const position = { bookId, chapterIndex, paragraphIndex, scrollRatio };
+  const previous = writing?.bookId === bookId ? writing : acknowledged.get(bookId);
+  if (equal(previous, position)) {
+    pendingProgress.delete(bookId);
+    if (pendingProgress.size === 0) cancel();
+    return;
   }
+  pendingProgress.set(bookId, position);
+  schedule();
 }

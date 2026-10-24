@@ -1,5 +1,6 @@
 //! Saga native Windows host container.
 
+mod database;
 mod ingestion;
 mod paths;
 #[cfg(test)]
@@ -17,7 +18,7 @@ fn ping() -> String {
 }
 
 use protocol::{ImportProgress, NovelImportResult};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 fn ingest(app: &tauri::AppHandle, path_str: String) -> Result<NovelImportResult, String> {
     // Emit at most one event per percentage point or phase transition.
@@ -57,10 +58,11 @@ fn ingest(app: &tauri::AppHandle, path_str: String) -> Result<NovelImportResult,
     if is_saga {
         report("reading", "正在验证 .saga 归档格式与签名...", 20);
         let books_dir = paths::directory(app, "books")?;
-        let conn = storage::open(&paths::directory(app, "storage")?.join("saga.db"))?;
         report("parsing", "正在解析 SGMF 调度元数据与章节分片...", 50);
         report("persisting", "正在挂载书籍与章节索引...", 80);
-        let result = storage::import_saga(&conn, file_path, &books_dir)?;
+        let result = app
+            .state::<database::Database>()
+            .execute(|connection| storage::import_saga(connection, file_path, &books_dir))?;
         report("completed", "导入完成", 100);
         return Ok(result);
     }
@@ -97,8 +99,9 @@ fn ingest(app: &tauri::AppHandle, path_str: String) -> Result<NovelImportResult,
 
     report("persisting", "正在打包 .saga 归档并持久化...", 75);
     let books_dir = paths::directory(app, "books")?;
-    let conn = storage::open(&paths::directory(app, "storage")?.join("saga.db"))?;
-    let validation = storage::save(&conn, &novel, "TXT", &books_dir)?;
+    let validation = app
+        .state::<database::Database>()
+        .execute(|connection| storage::save(connection, &novel, "TXT", &books_dir))?;
     report("completed", "导入完成，正在进入...", 100);
 
     Ok(NovelImportResult { novel, validation })
@@ -154,8 +157,9 @@ async fn import_txt_bytes(app: tauri::AppHandle, bytes: Vec<u8>, title: Option<S
         let books_dir = paths::directory(&app, "books")?;
 
         let novel = reader::parse_txt(&bytes, title.as_deref()).map_err(|e| e.to_string())?;
-        let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        let validation = storage::save(&conn, &novel, "TXT", &books_dir)?;
+        let validation = app
+            .state::<database::Database>()
+            .execute(|connection| storage::save(connection, &novel, "TXT", &books_dir))?;
 
         Ok(NovelImportResult { novel, validation })
     })
@@ -167,8 +171,8 @@ async fn import_txt_bytes(app: tauri::AppHandle, bytes: Vec<u8>, title: Option<S
 async fn delete_novel(app: tauri::AppHandle, id: String) -> Result<(), String> {
     tokio::task::spawn_blocking(move || {
         let books_dir = paths::directory(&app, "books")?;
-        let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::delete(&conn, &id, &books_dir)
+        app.state::<database::Database>()
+            .execute(|connection| storage::delete(connection, &id, &books_dir))
     })
     .await
     .map_err(|e| format!("后台删除失败: {}", e))?
@@ -176,20 +180,17 @@ async fn delete_novel(app: tauri::AppHandle, id: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn load_book_summaries(app: tauri::AppHandle) -> Result<Vec<protocol::BookSummary>, String> {
-    tokio::task::spawn_blocking(move || {
-        let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::summaries(&conn)
-    })
-    .await
-    .map_err(|e| format!("后台查询书籍失败: {}", e))?
+    tokio::task::spawn_blocking(move || app.state::<database::Database>().execute(storage::summaries))
+        .await
+        .map_err(|e| format!("后台查询书籍失败: {}", e))?
 }
 
 #[tauri::command]
 async fn load_novel(app: tauri::AppHandle, id: String) -> Result<Option<protocol::Novel>, String> {
     tokio::task::spawn_blocking(move || {
         let books_dir = paths::directory(&app, "books")?;
-        let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::load(&conn, &id, &books_dir)
+        app.state::<database::Database>()
+            .execute(|connection| storage::load(connection, &id, &books_dir))
     })
     .await
     .map_err(|e| format!("后台读取小说详情失败: {}", e))?
@@ -199,8 +200,7 @@ async fn load_novel(app: tauri::AppHandle, id: String) -> Result<Option<protocol
 async fn load_novels(app: tauri::AppHandle) -> Result<Vec<protocol::Novel>, String> {
     tokio::task::spawn_blocking(move || {
         let books_dir = paths::directory(&app, "books")?;
-        let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::all(&conn, &books_dir)
+        app.state::<database::Database>().execute(|connection| storage::all(connection, &books_dir))
     })
     .await
     .map_err(|e| format!("后台读取全部小说失败: {}", e))?
@@ -210,10 +210,11 @@ async fn load_novels(app: tauri::AppHandle) -> Result<Vec<protocol::Novel>, Stri
 async fn inspect_novel(app: tauri::AppHandle, id: String) -> Result<NovelImportResult, String> {
     tokio::task::spawn_blocking(move || {
         let books_dir = paths::directory(&app, "books")?;
-        let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        let novel = storage::load(&conn, &id, &books_dir)?.ok_or("book no longer exists")?;
-        let validation = review::inspect(&conn, &id, &novel.sections)?;
-        Ok(NovelImportResult { novel, validation })
+        app.state::<database::Database>().execute(|connection| {
+            let novel = storage::load(connection, &id, &books_dir)?.ok_or("book no longer exists")?;
+            let validation = review::inspect(connection, &id, &novel.sections)?;
+            Ok(NovelImportResult { novel, validation })
+        })
     })
     .await
     .map_err(|error| format!("后台核验失败: {}", error))?
@@ -228,8 +229,8 @@ async fn update_novel_sections(
 ) -> Result<protocol::NovelValidation, String> {
     tokio::task::spawn_blocking(move || {
         let books_dir = paths::directory(&app, "books")?;
-        let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::update(&conn, &book_id, &sections, &retained, &books_dir)
+        app.state::<database::Database>()
+            .execute(|connection| storage::update(connection, &book_id, &sections, &retained, &books_dir))
     })
     .await
     .map_err(|e| format!("后台更新章节失败: {}", e))?
@@ -238,8 +239,8 @@ async fn update_novel_sections(
 #[tauri::command]
 async fn update_reading_progress(app: tauri::AppHandle, book_id: String, chapter_index: u32, paragraph_index: u32, scroll_ratio: f64) -> Result<(), String> {
     tokio::task::spawn_blocking(move || {
-        let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::update_progress(&conn, &book_id, chapter_index, paragraph_index, scroll_ratio)
+        app.state::<database::Database>()
+            .execute(|connection| storage::update_progress(connection, &book_id, chapter_index, paragraph_index, scroll_ratio))
     })
     .await
     .map_err(|e| format!("后台更新阅读进度失败: {}", e))?
@@ -249,8 +250,8 @@ async fn update_reading_progress(app: tauri::AppHandle, book_id: String, chapter
 async fn export_novel_saga(app: tauri::AppHandle, book_id: String, output_path: String) -> Result<(), String> {
     tokio::task::spawn_blocking(move || {
         let books_dir = paths::directory(&app, "books")?;
-        let conn = storage::open(&paths::directory(&app, "storage")?.join("saga.db"))?;
-        storage::export_saga(&conn, &book_id, &books_dir, Path::new(&output_path))
+        app.state::<database::Database>()
+            .execute(|connection| storage::export_saga(connection, &book_id, &books_dir, Path::new(&output_path)))
     })
     .await
     .map_err(|e| format!("后台导出任务异常: {}", e))?
@@ -261,9 +262,42 @@ fn storage_location(app: tauri::AppHandle) -> Result<String, String> {
     Ok(paths::root(&app)?.to_string_lossy().into_owned())
 }
 
+/// Exports a consistent readable snapshot only after the user selects a JSON destination.
+#[tauri::command]
+async fn export_library_state(app: tauri::AppHandle, window: tauri::Window) -> Result<Option<String>, String> {
+    let destination = tokio::task::spawn_blocking(move || {
+        rfd::FileDialog::new()
+            .set_parent(&window)
+            .set_title("导出书架与阅读记录")
+            .add_filter("JSON 文件", &["json"])
+            .set_file_name("saga-library.json")
+            .save_file()
+    })
+    .await
+    .map_err(|error| format!("导出文件选择失败: {error}"))?;
+    let Some(mut destination) = destination else {
+        return Ok(None);
+    };
+    if destination.extension().is_none() {
+        destination.set_extension("json");
+    }
+    tokio::task::spawn_blocking(move || {
+        let bytes = app.state::<database::Database>().execute(storage::snapshot)?;
+        storage::export(&bytes, &destination)?;
+        Ok(Some(destination.to_string_lossy().into_owned()))
+    })
+    .await
+    .map_err(|error| format!("导出失败: {error}"))?
+}
+
 /// Runs the native host desktop application lifecycle.
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            let path = paths::directory(app.handle(), "storage")?.join("saga.db");
+            app.manage(database::Database::open(&path)?);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             ping,
             storage_location,
@@ -279,6 +313,7 @@ pub fn run() {
             load_novel,
             load_novels,
             update_reading_progress,
+            export_library_state,
             export_novel_saga
         ])
         .run(tauri::generate_context!())
