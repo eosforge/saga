@@ -44,7 +44,7 @@ function fixture(options = {}) {
   };
   class Input { constructor(value) { this.value = String(value); } }
   const boundaries = {
-    console, Blob, crypto: require('node:crypto').webcrypto, document, window, HTMLInputElement: Input,
+    console, Blob, crypto: require('node:crypto').webcrypto, document, window, HTMLInputElement: Input, defineEmits: () => () => {},
     performance: { now: () => elapsed },
     localStorage: {
       getItem(key) { if (options.inaccessible) throw Error('storage blocked'); return storage.get(key) ?? null; },
@@ -287,6 +287,86 @@ test('close does not terminate an active book operation', async () => {
   assert.equal(ui.destructions, 0); assert.equal(ui.calls.length, 0);
   assert.match(ui.store.failure.value, /尚未完成/);
   app.unmount();
+});
+
+test('deletion blocks repeated close requests until the shelf operation succeeds', async (context) => {
+  const pending = deferred();
+  const ui = fixture({ invoke: command => {
+    assert.equal(command, 'delete_novel');
+    return pending.promise;
+  } });
+  const app = ui.load('App.vue', 'currentTab'); app.mount(); await settle();
+  const shelf = ui.load('views/Shelf.vue', 'bookToDelete, confirmDelete');
+  shelf.bookToDelete.value = ui.store.books.value[0];
+  const deleting = shelf.confirmDelete();
+  context.after(async () => { pending.resolve(); await deleting; app.unmount(); });
+  assert.equal(ui.calls.length, 1);
+  const event = { preventDefault() {} };
+  for (let index = 0; index < 2; index++) {
+    await ui.callbacks.close(event);
+    assert.equal(ui.destructions, 0, 'pending native deletion must retain the window');
+  }
+  assert.match(ui.store.failure.value, /书籍操作尚未完成/);
+  await ui.store.deleteBook('book');
+  await ui.callbacks.close(event);
+  assert.equal(ui.destructions, 0, 'a duplicate deletion must not release the original operation');
+  assert.equal(ui.calls.length, 1);
+  pending.resolve(); await deleting;
+  assert.equal(ui.store.books.value.length, 0);
+  await ui.callbacks.close(event);
+  assert.equal(ui.destructions, 1);
+});
+
+test('deletion failure releases close protection and preserves queued progress for saving', async (context) => {
+  const writing = deferred(), pending = deferred();
+  const ui = fixture({ invoke: command => command === 'delete_novel' ? pending.promise
+    : ui.calls.length === 1 ? writing.promise : undefined });
+  const app = ui.load('App.vue', 'currentTab'); app.mount(); await settle();
+  ui.store.saveReadingProgress('book', 1, 0, 0.2);
+  const flushing = ui.store.flushReadingProgress();
+  ui.store.saveReadingProgress('book', 2, 1, 0.8);
+  const rejected = assert.rejects(ui.store.deleteBook('book'), /archive locked/);
+  context.after(async () => { writing.resolve(); pending.reject(Error('archive locked')); await flushing; await rejected; app.unmount(); });
+  const event = { preventDefault() {} };
+  const closing = ui.callbacks.close(event);
+  await settle();
+  assert.equal(ui.load('lifecycle.ts').closing.value, false, 'deletion waiting for a progress write must reject close immediately');
+  writing.resolve(); await flushing; await closing; await settle();
+  assert.equal(ui.destructions, 0);
+  assert.deepEqual(ui.calls.map(call => call.command), ['update_reading_progress', 'delete_novel']);
+  await ui.callbacks.close(event);
+  assert.equal(ui.destructions, 0);
+  pending.reject(Error('archive locked')); await rejected;
+  assert.equal(ui.store.books.value.length, 1);
+  await ui.callbacks.close(event);
+  assert.equal(ui.destructions, 1);
+  assert.deepEqual(ui.calls.filter(call => call.command === 'update_reading_progress').map(call => call.payload.chapterIndex), [1, 2]);
+});
+
+test('deletion ownership survives overlapping books and independent busy work', async (context) => {
+  const first = deferred(), second = deferred();
+  const ui = fixture({ invoke: (command, payload) => {
+    assert.equal(command, 'delete_novel');
+    return payload.id === 'book' ? first.promise : second.promise;
+  } });
+  const app = ui.load('App.vue', 'currentTab'); app.mount(); await settle();
+  ui.store.importBook('Other book', 'Author');
+  const other = ui.store.activeBookId.value;
+  const firstDeletion = ui.store.deleteBook('book'), secondDeletion = ui.store.deleteBook(other);
+  context.after(async () => { first.resolve(); second.resolve(); await firstDeletion; await secondDeletion; app.unmount(); });
+  const event = { preventDefault() {} };
+  await ui.callbacks.close(event);
+  assert.equal(ui.destructions, 0);
+  first.resolve(); await firstDeletion;
+  await ui.callbacks.close(event);
+  assert.equal(ui.destructions, 0, 'another book is still being deleted');
+  ui.store.isGlobalBusy.value = true;
+  second.resolve(); await secondDeletion;
+  await ui.callbacks.close(event);
+  assert.equal(ui.destructions, 0, 'finishing deletion must not clear another operation');
+  ui.store.isGlobalBusy.value = false;
+  await ui.callbacks.close(event);
+  assert.equal(ui.destructions, 1);
 });
 
 test('teardown owns late native registrations and does not close a replaced application view', async () => {

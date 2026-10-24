@@ -80,6 +80,11 @@ const deleting = new Set<string>();
 let revision = 0;
 let playTimer: ReturnType<typeof setInterval> | null = null;
 
+/** Keep normal close blocked while a book operation or any owned deletion remains active. */
+export function busy(): boolean {
+  return isGlobalBusy.value || deleting.size > 0;
+}
+
 /** Record one successfully published catalog mutation. */
 function revise(id: string): void {
   versions.set(id, ++revision);

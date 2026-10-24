@@ -1,0 +1,372 @@
+{
+  "version": 1,
+  "milestone": "CLOSE-01",
+  "recordedAt": "2026-10-24T10:43:01.786Z",
+  "status": "fixed-local-verification",
+  "qualification": "not-qualified",
+  "trust": "local-unsealed",
+  "authorization": "User explicitly requested fixing the identified deletion/close defect, committing and pushing.",
+  "contract": "Normal close must retain the window while any owned book deletion or existing import/audit operation remains active. Success or failure releases only that deletion. The user can retry close after all operations finish; completion does not close automatically.",
+  "implementation": {
+    "query": "apps/windows/src/stores/library.ts: busy() reads the existing busy flag and owned deletion set without adding a second mutable state.",
+    "consumer": "apps/windows/src/lifecycle.ts: close() checks busy() before flushing progress or destroying the window.",
+    "ownership": "Existing deleteBook() owns deletion from before waiting on issued progress until its finally block; duplicate deletion requests do not acquire or release ownership."
+  },
+  "regressions": [
+    "Real Shelf.confirmDelete with pending native deletion, repeated close requests, duplicate deletion and successful completion.",
+    "Deletion waiting on issued progress, native failure, retained book and queued progress saved on a later close.",
+    "Overlapping deletions and independent busy work retain protection until every owner finishes."
+  ],
+  "counterexample": {
+    "identity": "2026-10-24T10-40-38-478Z-223ac1a7-deletion",
+    "phase": "counterexample-before-fix",
+    "started": "2026-10-24T10:40:38.481Z",
+    "finished": "2026-10-24T10:40:38.934Z",
+    "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\15140_1792747042762\\node.exe",
+    "args": [
+      "--test",
+      "--test-name-pattern=^deletion ",
+      "tests/persistence.cjs"
+    ],
+    "cwd": "apps/windows",
+    "exitCode": 1,
+    "signal": null,
+    "error": null,
+    "source": [
+      {
+        "path": "apps/windows/src/lifecycle.ts",
+        "sha256": "0218434fe779e418b6b3b90a3368fd70019b74c4d9e6e0cf9305241108828c03"
+      },
+      {
+        "path": "apps/windows/src/stores/library.ts",
+        "sha256": "ec4d9a7407c31a68b0169a65372e15943143e1e0173f5942221accd0f97d6db1"
+      },
+      {
+        "path": "apps/windows/tests/persistence.cjs",
+        "sha256": "707e1d6d36bbed1289dc4b3a5b782e6e071a75e2a0e983a1a5b376bb3c0f0ddc"
+      }
+    ],
+    "summary": {
+      "tests": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0
+    },
+    "logs": [
+      {
+        "path": "docs/evidence/2026-10-24T10-40-38-478Z-223ac1a7-deletion/red.stdout.log",
+        "sha256": "2c77de2c67b2ab3dafb79ef009fda29ea9ac4cdc07dd5d97122264a60f7e468b"
+      },
+      {
+        "path": "docs/evidence/2026-10-24T10-40-38-478Z-223ac1a7-deletion/red.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "retention": "Raw logs and counterexample receipt remain local diagnostic material."
+  },
+  "verification": {
+    "checksPassed": 8,
+    "frontend": {
+      "tests": 71,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0
+    },
+    "runner": {
+      "tests": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    "rust": {
+      "passed": 88,
+      "failed": 0,
+      "ignored": 2
+    },
+    "sourceUnchanged": true,
+    "environment": {
+      "platform": "win32",
+      "architecture": "x64",
+      "node": "v24.18.0",
+      "rust": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+      "typescript": "5.9.3"
+    },
+    "checks": [
+      {
+        "id": "runner",
+        "program": "node",
+        "cwd": ".",
+        "args": [
+          "--test",
+          "tools/check.test.cjs"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\15140_1792747042762\\node.exe",
+        "arguments": [
+          "--test",
+          "tools/check.test.cjs"
+        ],
+        "started": "2026-10-24T10:41:52.871Z",
+        "finished": "2026-10-24T10:41:53.521Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 304,
+        "passed": true,
+        "log": "runner.log",
+        "sha256": "59f64627de2220a84fca25c5190b279ae2227c75411dbb49ada2ebe2ef7d6ea3"
+      },
+      {
+        "id": "format",
+        "program": "cargo",
+        "cwd": ".",
+        "args": [
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "timeoutMs": 30000,
+        "command": "rustup",
+        "arguments": [
+          "run",
+          "1.98.0",
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "started": "2026-10-24T10:41:53.522Z",
+        "finished": "2026-10-24T10:41:53.716Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 0,
+        "passed": true,
+        "log": "format.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "id": "clippy",
+        "program": "cargo",
+        "cwd": ".",
+        "args": [
+          "clippy",
+          "--offline",
+          "--locked",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "timeoutMs": 180000,
+        "command": "rustup",
+        "arguments": [
+          "run",
+          "1.98.0",
+          "cargo",
+          "clippy",
+          "--offline",
+          "--locked",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "started": "2026-10-24T10:41:53.716Z",
+        "finished": "2026-10-24T10:41:54.299Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 72,
+        "passed": true,
+        "log": "clippy.log",
+        "sha256": "45f75b19e5718ce74d75d27dc949e2b0cc21908a1e53dca4d31c24e03ebe8e09"
+      },
+      {
+        "id": "rust",
+        "program": "cargo",
+        "cwd": ".",
+        "args": [
+          "test",
+          "--offline",
+          "--locked",
+          "--workspace"
+        ],
+        "timeoutMs": 180000,
+        "command": "rustup",
+        "arguments": [
+          "run",
+          "1.98.0",
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "--workspace"
+        ],
+        "started": "2026-10-24T10:41:54.300Z",
+        "finished": "2026-10-24T10:41:55.591Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 7890,
+        "passed": true,
+        "log": "rust.log",
+        "sha256": "d63c1e48cab449ab515c5b3b67f5a202011b6aec6edc812f47e91121fb7cc520"
+      },
+      {
+        "id": "style",
+        "program": "node",
+        "cwd": "apps/windows",
+        "args": [
+          "tools/style.cjs"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\15140_1792747042762\\node.exe",
+        "arguments": [
+          "tools/style.cjs"
+        ],
+        "started": "2026-10-24T10:41:55.591Z",
+        "finished": "2026-10-24T10:41:55.881Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 68,
+        "passed": true,
+        "log": "style.log",
+        "sha256": "c57bd349e513259ba4751b7116f3ddf52618c66895e4867984e214ee8ba2536e"
+      },
+      {
+        "id": "frontend",
+        "program": "node",
+        "cwd": "apps/windows",
+        "args": [
+          "--test",
+          "tests/*.cjs"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\15140_1792747042762\\node.exe",
+        "arguments": [
+          "--test",
+          "tests/*.cjs"
+        ],
+        "started": "2026-10-24T10:41:55.881Z",
+        "finished": "2026-10-24T10:41:56.879Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 6588,
+        "passed": true,
+        "log": "frontend.log",
+        "sha256": "dd85e27d4c60f8029392683c5190efa232a426ba6d72729b2e526dafa75965cf"
+      },
+      {
+        "id": "types",
+        "program": "node",
+        "cwd": "apps/windows",
+        "args": [
+          "node_modules/vue-tsc/bin/vue-tsc.js",
+          "--noEmit"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\15140_1792747042762\\node.exe",
+        "arguments": [
+          "node_modules/vue-tsc/bin/vue-tsc.js",
+          "--noEmit"
+        ],
+        "started": "2026-10-24T10:41:56.879Z",
+        "finished": "2026-10-24T10:41:58.027Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 0,
+        "passed": true,
+        "log": "types.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "id": "build",
+        "program": "node",
+        "cwd": "apps/windows",
+        "args": [
+          "node_modules/vite/bin/vite.js",
+          "build"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\15140_1792747042762\\node.exe",
+        "arguments": [
+          "node_modules/vite/bin/vite.js",
+          "build"
+        ],
+        "started": "2026-10-24T10:41:58.028Z",
+        "finished": "2026-10-24T10:41:59.090Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 977,
+        "passed": true,
+        "log": "build.log",
+        "sha256": "246c49b39ce5729db97d23f63212ddb5dd8a212a3587e65665f4c385d76d1858"
+      }
+    ]
+  },
+  "source": {
+    "headBeforeCommit": "40542d4e9aff29995d63849baf2067d091f844b3",
+    "uncommittedAtVerification": true,
+    "checkedFiles": 115,
+    "fullManifestSha256": "7878814992275be5e4994cef9f183a4233c24df5c952b448e697ab9d23fbe8ca",
+    "changed": [
+      {
+        "path": "apps/windows/src/lifecycle.ts",
+        "sha256": "3c02fa8ed215555d1e414075f08823ddcf2b71f689cd48e5c4cdcc874f1808e5"
+      },
+      {
+        "path": "apps/windows/src/stores/library.ts",
+        "sha256": "cbb6c6d3c29f4924263cc2c84688a44a4b57f40e1b448f11d713046661258519"
+      },
+      {
+        "path": "apps/windows/tests/persistence.cjs",
+        "sha256": "707e1d6d36bbed1289dc4b3a5b782e6e071a75e2a0e983a1a5b376bb3c0f0ddc"
+      },
+      {
+        "path": "docs/maintenance.md",
+        "sha256": "4602c030494fe9e60a0f65f4692c6a3bfe5b9f93a912138200fe36a9cd7d7d7f"
+      },
+      {
+        "path": "docs/maintenance_CN.md",
+        "sha256": "d47adac79394ca653f1e1a9fe3e7b5f94d0d96bba37d0ceb11f01e03dbc1ebdd"
+      },
+      {
+        "path": "docs/worklog.md",
+        "sha256": "cdb7035aeb57f6f25f80e7654ea50d079c5c969584e46fbf87bacebbfce0ceb4"
+      },
+      {
+        "path": "docs/worklog_CN.md",
+        "sha256": "d5802dbb5efef96ee5a4cbce9e75fe491cace2161f4201f64e7363dfea015f47"
+      }
+    ]
+  },
+  "evidence": {
+    "identity": "2026-10-24T10-41-52-819Z-d3bb5f15",
+    "receipt": "docs/evidence/2026-10-24T10-41-52-819Z-d3bb5f15/receipt.json",
+    "sha256": "59e4c33c162b89972b063ac6c0f0dad080c0282ba257c1fc728f342b051f8a6b",
+    "retention": "The full manifest, original receipt and raw logs are retained locally, not promised in a fresh clone. This selected result is tracked."
+  },
+  "limitations": [
+    "Native deletion and window callbacks are controlled test boundaries; real desktop event delivery and process-exit effects were not exercised.",
+    "Two SAGA_SAMPLE-dependent original-book tests remain ignored in the default Rust suite.",
+    "No application was launched, live book was deleted, dependency installed, or service changed.",
+    "No crash/power-loss, formal coverage/MC-DC, mutation or release qualification is established."
+  ]
+}

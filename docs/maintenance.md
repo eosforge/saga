@@ -50,6 +50,14 @@ Verification covers resident connection reuse and serialization, SQL failures, p
 
 The 2026-10-24 pre-commit review found that global mouse back/forward navigation could still switch views while close waited for progress persistence. The close guard now covers that handler as well as keyboard input and page controls. A regression first reproduced the unwanted transition from reader to shelf. [The review result](evidence/2026-10-24-review/result.json) records subsequent verification without replacing the original RESIDENT-01 evidence.
 
+## Deletion close protection (CLOSE-01)
+
+The 2026-10-24 follow-up found that normal close checked the import/audit busy flag but missed pending book deletions. A delayed `delete_novel` response allowed the close handler to request window destruction before deletion finished. The library now exposes a synchronous `busy()` query combining that existing flag with its owned deletion set; the close handler uses this query before draining progress or destroying the window.
+
+Deletion ownership starts before waiting for an issued progress write and ends in the existing `finally` block after success or failure. Duplicate requests for the same book do not release the original task. Completing one deletion cannot release another book's deletion or clear an independent import/audit operation. While any such operation remains active, close keeps the window open and asks the user to retry later; completion does not automatically close it. Failed deletion retains the book and queued progress for a later save.
+
+Three regressions exercise the actual shelf/store/close handlers with controlled native boundaries: successful deletion with repeated close requests, failure after an in-flight progress write, and overlapping deletions with independent busy work. All three first failed against the previous implementation. [The CLOSE-01 result](evidence/2026-10-24-close/result.json) records final verification and source identities. Real desktop event delivery and process-exit data effects remain unqualified; earlier evidence is unchanged.
+
 ## Local checks
 
 [development.json](../development.json) is a version-1 local-feedback registry validated by [tools/check.cjs](../tools/check.cjs). It records component consequence levels, the verified environment, commands, and per-process deadlines in milliseconds. Classifying a component does not establish that its obligations passed.

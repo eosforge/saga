@@ -2,7 +2,7 @@
 import { ref } from "vue";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow, type CloseRequestedEvent } from "@tauri-apps/api/window";
-import { failure, flushReadingProgress, isGlobalBusy } from "./stores/library";
+import { failure, flushReadingProgress, busy } from "./stores/library";
 
 /** Blocks interaction while a normal close drains outstanding reading positions. */
 export const closing = ref(false);
@@ -40,7 +40,7 @@ export function register(): () => void {
   async function close(event: CloseRequestedEvent): Promise<void> {
     event.preventDefault();
     if (disposed || requesting) return;
-    if (isGlobalBusy.value) {
+    if (busy()) {
       failure.value = "书籍操作尚未完成，请稍后再关闭";
       return;
     }
