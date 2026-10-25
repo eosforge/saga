@@ -80,6 +80,37 @@ function audit(sections) {
   ui.lifecycle.mount();
   return { ...ui, get received() { return received; } };
 }
+
+/** Model stable/reflowed paragraph bounds while executing the actual reader and library. */
+function reading(heights, gap = 26) {
+  const { store } = graph(async () => { throw Error('unexpected native call'); }, false);
+  const book = novel(1);
+  book.sections[0].body = heights.map((_, index) => 'Paragraph ' + index + '.').join('\n');
+  book.sections[0].chunks = [];
+  store.importNovel(book);
+  const ui = component('Reader', store, 'readerViewportRef, restoreReadingPosition, updateReadingPositionFromScroll');
+  const layout = { heights, gap, top: 150, chapter: 80, heading: 60, trailing: 40, offset: 80 };
+  let scroll = 0;
+  const height = () => layout.heading + layout.heights.reduce((sum, value) => sum + value + layout.gap, 0) + layout.trailing;
+  const start = index => layout.chapter + layout.heading + layout.heights.slice(0, index).reduce((sum, value) => sum + value + layout.gap, 0);
+  const paragraphs = heights.map((_, index) => ({
+    getBoundingClientRect: () => ({ top: layout.top + start(index) - scroll, bottom: layout.top + start(index) + layout.heights[index] - scroll, height: layout.heights[index] }),
+    scrollIntoView() { scroll = start(index); },
+  }));
+  const block = {
+    dataset: { chapterIndex: '0' },
+    get offsetTop() { return layout.offset; }, get offsetHeight() { return height(); },
+    getBoundingClientRect: () => ({ top: layout.top + layout.chapter - scroll, bottom: layout.top + layout.chapter + height() - scroll, height: height() }),
+    querySelectorAll: () => paragraphs,
+  };
+  const viewport = {
+    get scrollTop() { return scroll; }, set scrollTop(value) { scroll = Math.max(0, value); },
+    getBoundingClientRect: () => ({ top: layout.top, bottom: layout.top + 600 }),
+    querySelector: () => block, querySelectorAll: () => [block],
+  };
+  ui.readerViewportRef.value = vue.markRaw(viewport);
+  return { ...ui, store, layout, viewport, height, start };
+}
 test('audit: merged body must match text displayed before and after reload', async () => {
   const ui = audit([chapter(0), chapter(1, false)]);
   ui.openPopoverForSection(ui.sections.value[1]);
@@ -282,4 +313,85 @@ test('reader: a failed progress flush keeps the return action on the reader', as
   const ui = component('Reader', library, 'handleBackToShelf');
   await ui.handleBackToShelf();
   assert.equal(ui.events.length, 0);
+});
+
+test('reader restoration: reopening a long first paragraph preserves its exact reading offset', () => {
+  const ui = reading([2000]);
+  ui.viewport.scrollTop = 200;
+  ui.updateReadingPositionFromScroll();
+  const ratio = ui.store.activeBook.value.currentScrollRatio;
+  for (let repeat = 0; repeat < 5; repeat++) {
+    ui.viewport.scrollTop = 0;
+    ui.restoreReadingPosition();
+    assert.ok(Math.abs(ui.viewport.scrollTop - 200) < 0.001, 'restoration advanced the viewport');
+    ui.updateReadingPositionFromScroll();
+    assert.equal(ui.store.activeBook.value.currentParagraphIndex, 0);
+    assert.ok(Math.abs(ui.store.activeBook.value.currentScrollRatio - ratio) < 1e-9);
+  }
+});
+
+test('reader restoration: short paragraphs and their preceding gaps do not advance across reopenings', () => {
+  for (const initial of [160, 216]) {
+    const ui = reading(Array(30).fill(42));
+    ui.viewport.scrollTop = initial; ui.updateReadingPositionFromScroll();
+    assert.equal(ui.store.activeBook.value.currentParagraphIndex, 2);
+    for (let repeat = 0; repeat < 5; repeat++) {
+      ui.viewport.scrollTop = 0; ui.restoreReadingPosition(); ui.updateReadingPositionFromScroll();
+      assert.equal(ui.store.activeBook.value.currentParagraphIndex, 2, 'a later paragraph replaced the saved anchor');
+      assert.ok(Math.abs(ui.viewport.scrollTop - initial) < 0.001);
+    }
+  }
+});
+
+test('reader restoration: positioned ancestors and a moved viewport do not change the reading offset', () => {
+  const ui = reading([2000]);
+  ui.viewport.scrollTop = 200; ui.updateReadingPositionFromScroll();
+  ui.layout.offset = 777; ui.layout.top = 340;
+  ui.viewport.scrollTop = 45; ui.restoreReadingPosition(); ui.updateReadingPositionFromScroll();
+  assert.ok(Math.abs(ui.viewport.scrollTop - 200) < 0.001, 'offsetParent coordinates were used as viewport coordinates');
+});
+
+test('reader restoration: reflow keeps the saved paragraph when its old chapter ratio points elsewhere', () => {
+  const ui = reading(Array(30).fill(42));
+  ui.viewport.scrollTop = 216; ui.updateReadingPositionFromScroll();
+  ui.layout.heights[0] = 420;
+  ui.viewport.scrollTop = 0; ui.restoreReadingPosition(); ui.updateReadingPositionFromScroll();
+  assert.equal(ui.store.activeBook.value.currentParagraphIndex, 2);
+  const restored = ui.viewport.scrollTop;
+  for (let repeat = 0; repeat < 5; repeat++) {
+    ui.viewport.scrollTop = 0; ui.restoreReadingPosition(); ui.updateReadingPositionFromScroll();
+    assert.equal(ui.store.activeBook.value.currentParagraphIndex, 2);
+    assert.ok(Math.abs(ui.viewport.scrollTop - restored) < 0.001);
+  }
+});
+
+test('reader restoration: paragraph-only anchors remain stable even without paragraph margins', () => {
+  const ui = reading(Array(30).fill(42), 0);
+  ui.store.activeBook.value.currentParagraphIndex = 2;
+  ui.store.activeBook.value.currentScrollRatio = 0;
+  for (let repeat = 0; repeat < 5; repeat++) {
+    ui.viewport.scrollTop = 0; ui.restoreReadingPosition(); ui.updateReadingPositionFromScroll();
+    assert.equal(ui.store.activeBook.value.currentParagraphIndex, 2);
+  }
+});
+
+test('reader restoration: initial and empty chapters keep their heading at the top', () => {
+  for (const heights of [[], [2000]]) {
+    const ui = reading(heights);
+    ui.viewport.scrollTop = 180; ui.restoreReadingPosition();
+    assert.equal(ui.viewport.scrollTop, 0);
+  }
+});
+
+test('reader restoration: the end of a chapter retains its last paragraph instead of wrapping to zero', () => {
+  const ui = reading(Array(30).fill(42));
+  // A following chapter provides scroll space beyond the last paragraph of this block.
+  const initial = ui.start(29) + 42 + 10 - 100;
+  ui.viewport.scrollTop = initial; ui.updateReadingPositionFromScroll();
+  assert.equal(ui.store.activeBook.value.currentParagraphIndex, 29);
+  for (let repeat = 0; repeat < 3; repeat++) {
+    ui.viewport.scrollTop = 0; ui.restoreReadingPosition(); ui.updateReadingPositionFromScroll();
+    assert.equal(ui.store.activeBook.value.currentParagraphIndex, 29);
+    assert.ok(Math.abs(ui.viewport.scrollTop - initial) < 0.001);
+  }
 });

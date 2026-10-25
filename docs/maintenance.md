@@ -58,6 +58,14 @@ Deletion ownership starts before waiting for an issued progress write and ends i
 
 Three regressions exercise the actual shelf/store/close handlers with controlled native boundaries: successful deletion with repeated close requests, failure after an in-flight progress write, and overlapping deletions with independent busy work. All three first failed against the previous implementation. [The CLOSE-01 result](evidence/2026-10-24-close/result.json) records final verification and source identities. Real desktop event delivery and process-exit data effects remain unqualified; earlier evidence is unchanged.
 
+## Stable reading-position restoration (RESTORE-01)
+
+The 2026-10-25 repair aligns reading-position capture and restoration to the same line, 100 CSS pixels below the viewport top. Within the available scroll range, restoring an unchanged layout must not advance the saved position or paragraph. Restoration derives its scroll delta from client rectangles instead of treating an element's `offsetTop` as a viewport coordinate. The existing chapter/paragraph/ratio fields and storage format remain unchanged.
+
+The saved chapter ratio preserves the position within a paragraph or its preceding gap when it still identifies the saved paragraph. If reflow moves that ratio into another paragraph, restoration places the saved paragraph just inside the reading line; exact character or intra-paragraph position after reflow is not guaranteed. A zero paragraph/zero ratio anchor keeps the chapter heading at the top. Capture and restoration share paragraph selection, retaining the last paragraph in trailing chapter space instead of wrapping to paragraph zero. Previously overwritten positions cannot be reconstructed by this correction.
+
+Seven controlled-layout regressions cover repeated reopening of a long first paragraph, short paragraphs and gaps, differing offset parents and viewport positions, reflow, paragraph-only anchors without margins, initial/empty chapters, and trailing chapter space. Six failed against the previous implementation; the initial/empty case already passed. [The RESTORE-01 result](evidence/2026-10-25-restoration/result.json) records final checks and source identities. These tests execute actual reader/store code with simulated layout; real desktop rendering and font/layout behavior remain unqualified.
+
 ## Local checks
 
 [development.json](../development.json) is a version-1 local-feedback registry validated by [tools/check.cjs](../tools/check.cjs). It records component consequence levels, the verified environment, commands, and per-process deadlines in milliseconds. Classifying a component does not establish that its obligations passed.

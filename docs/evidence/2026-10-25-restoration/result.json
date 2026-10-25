@@ -1,0 +1,372 @@
+{
+  "version": 1,
+  "milestone": "RESTORE-01",
+  "recordedAt": "2026-10-25T12:43:20.837Z",
+  "status": "fixed-local-verification",
+  "qualification": "not-qualified",
+  "trust": "local-unsealed",
+  "authorization": "User explicitly requested fixing the identified reader restoration defect, then committing and pushing.",
+  "contract": "Within the available scroll range, repeated capture and restoration of an unchanged layout must preserve the reading offset and paragraph. After reflow, the paragraph remains authoritative when the old chapter ratio identifies a different paragraph.",
+  "implementation": {
+    "file": "apps/windows/src/views/Reader.vue",
+    "coordinates": "Capture and restoration share the reading line at viewport top plus 100 CSS pixels. Client rectangles provide a viewport-relative scroll delta instead of offsetParent coordinates.",
+    "selection": "Shared locate() selects the paragraph at the reading line, including preceding gaps and trailing space. Trailing chapter space retains the last paragraph.",
+    "restoration": "Reuse the chapter ratio when it identifies the saved paragraph; otherwise place the reading line just inside that paragraph. A zero paragraph/zero ratio preserves the chapter heading. Fractional offsets are not rounded to integers.",
+    "compatibility": "No storage schema, persisted fields, native command or book format changes."
+  },
+  "counterexample": {
+    "identity": "2026-10-25T12-38-34-353Z-436f44f5-restoration",
+    "phase": "counterexample-before-fix",
+    "started": "2026-10-25T12:38:34.355Z",
+    "finished": "2026-10-25T12:38:35.887Z",
+    "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\26644_1792842652909\\node.exe",
+    "args": [
+      "--test",
+      "--test-name-pattern=^reader restoration:",
+      "tests/regression.cjs"
+    ],
+    "cwd": "apps/windows",
+    "exitCode": 1,
+    "signal": null,
+    "error": null,
+    "source": [
+      {
+        "path": "apps/windows/src/views/Reader.vue",
+        "sha256": "c8b8e9c6076ddcbe38866827065aa93969ea82ac64a58cd4465a9dc429dac234"
+      },
+      {
+        "path": "apps/windows/tests/regression.cjs",
+        "sha256": "48147e9dcd849f0e87c2435892dd9b8f502e26078bd09f538f605f0a8a10f5d8"
+      }
+    ],
+    "summary": {
+      "tests": 7,
+      "passed": 1,
+      "failed": 6,
+      "skipped": 0
+    },
+    "interpretation": "Six new regressions failed before the fix; the initial/empty chapter case already passed.",
+    "logs": [
+      {
+        "path": "docs/evidence/2026-10-25T12-38-34-353Z-436f44f5-restoration/red.stdout.log",
+        "sha256": "ed343571bb0193d95e671e473aa9a86e3153bc3e603b1f91c90f3fce345b791f"
+      },
+      {
+        "path": "docs/evidence/2026-10-25T12-38-34-353Z-436f44f5-restoration/red.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "retention": "Raw counterexample logs and receipt remain local diagnostic material."
+  },
+  "verification": {
+    "checksPassed": 8,
+    "frontend": {
+      "tests": 78,
+      "passed": 78,
+      "failed": 0,
+      "skipped": 0
+    },
+    "runner": {
+      "tests": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    "rust": {
+      "passed": 88,
+      "failed": 0,
+      "ignored": 2
+    },
+    "regressions": [
+      "✔ reader restoration: reopening a long first paragraph preserves its exact reading offset (31.4876ms)",
+      "✔ reader restoration: short paragraphs and their preceding gaps do not advance across reopenings (60.5967ms)",
+      "✔ reader restoration: positioned ancestors and a moved viewport do not change the reading offset (32.3908ms)",
+      "✔ reader restoration: reflow keeps the saved paragraph when its old chapter ratio points elsewhere (28.85ms)",
+      "✔ reader restoration: paragraph-only anchors remain stable even without paragraph margins (34.4471ms)",
+      "✔ reader restoration: initial and empty chapters keep their heading at the top (52.9539ms)",
+      "✔ reader restoration: the end of a chapter retains its last paragraph instead of wrapping to zero (32.097ms)"
+    ],
+    "sourceUnchanged": true,
+    "environment": {
+      "platform": "win32",
+      "architecture": "x64",
+      "node": "v24.18.0",
+      "rust": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+      "typescript": "5.9.3"
+    },
+    "checks": [
+      {
+        "id": "runner",
+        "program": "node",
+        "cwd": ".",
+        "args": [
+          "--test",
+          "tools/check.test.cjs"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\26644_1792842652909\\node.exe",
+        "arguments": [
+          "--test",
+          "tools/check.test.cjs"
+        ],
+        "started": "2026-10-25T12:41:42.706Z",
+        "finished": "2026-10-25T12:41:43.300Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 305,
+        "passed": true,
+        "log": "runner.log",
+        "sha256": "ec412679844cd573249d33b31d78a49f415050e30c3b6ba278566887ebe681ae"
+      },
+      {
+        "id": "format",
+        "program": "cargo",
+        "cwd": ".",
+        "args": [
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "timeoutMs": 30000,
+        "command": "rustup",
+        "arguments": [
+          "run",
+          "1.98.0",
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "started": "2026-10-25T12:41:43.303Z",
+        "finished": "2026-10-25T12:41:43.775Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 0,
+        "passed": true,
+        "log": "format.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "id": "clippy",
+        "program": "cargo",
+        "cwd": ".",
+        "args": [
+          "clippy",
+          "--offline",
+          "--locked",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "timeoutMs": 180000,
+        "command": "rustup",
+        "arguments": [
+          "run",
+          "1.98.0",
+          "cargo",
+          "clippy",
+          "--offline",
+          "--locked",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "started": "2026-10-25T12:41:43.776Z",
+        "finished": "2026-10-25T12:41:53.915Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 72,
+        "passed": true,
+        "log": "clippy.log",
+        "sha256": "85e077144148eec18f67623e48566f4cf74758f086e59ba049b53a6b6fb6df74"
+      },
+      {
+        "id": "rust",
+        "program": "cargo",
+        "cwd": ".",
+        "args": [
+          "test",
+          "--offline",
+          "--locked",
+          "--workspace"
+        ],
+        "timeoutMs": 180000,
+        "command": "rustup",
+        "arguments": [
+          "run",
+          "1.98.0",
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "--workspace"
+        ],
+        "started": "2026-10-25T12:41:53.916Z",
+        "finished": "2026-10-25T12:42:07.222Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 7890,
+        "passed": true,
+        "log": "rust.log",
+        "sha256": "7a4e674a6b0ad1442b9114f6116401c717a50cf5f0a61d5d7fdf8165327e50ff"
+      },
+      {
+        "id": "style",
+        "program": "node",
+        "cwd": "apps/windows",
+        "args": [
+          "tools/style.cjs"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\26644_1792842652909\\node.exe",
+        "arguments": [
+          "tools/style.cjs"
+        ],
+        "started": "2026-10-25T12:42:07.223Z",
+        "finished": "2026-10-25T12:42:07.524Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 68,
+        "passed": true,
+        "log": "style.log",
+        "sha256": "c57bd349e513259ba4751b7116f3ddf52618c66895e4867984e214ee8ba2536e"
+      },
+      {
+        "id": "frontend",
+        "program": "node",
+        "cwd": "apps/windows",
+        "args": [
+          "--test",
+          "tests/*.cjs"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\26644_1792842652909\\node.exe",
+        "arguments": [
+          "--test",
+          "tests/*.cjs"
+        ],
+        "started": "2026-10-25T12:42:07.524Z",
+        "finished": "2026-10-25T12:42:08.910Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 7327,
+        "passed": true,
+        "log": "frontend.log",
+        "sha256": "eed4de601d12467e8acf4cf481770ddf1104c447abaa47182e854ac815f90477"
+      },
+      {
+        "id": "types",
+        "program": "node",
+        "cwd": "apps/windows",
+        "args": [
+          "node_modules/vue-tsc/bin/vue-tsc.js",
+          "--noEmit"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\26644_1792842652909\\node.exe",
+        "arguments": [
+          "node_modules/vue-tsc/bin/vue-tsc.js",
+          "--noEmit"
+        ],
+        "started": "2026-10-25T12:42:08.910Z",
+        "finished": "2026-10-25T12:42:12.187Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 0,
+        "passed": true,
+        "log": "types.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "id": "build",
+        "program": "node",
+        "cwd": "apps/windows",
+        "args": [
+          "node_modules/vite/bin/vite.js",
+          "build"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\26644_1792842652909\\node.exe",
+        "arguments": [
+          "node_modules/vite/bin/vite.js",
+          "build"
+        ],
+        "started": "2026-10-25T12:42:12.188Z",
+        "finished": "2026-10-25T12:42:14.305Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 977,
+        "passed": true,
+        "log": "build.log",
+        "sha256": "c876016d245fdb7c9399c6694f39b0a0794e78c1cf8059f77b4341af606745b9"
+      }
+    ]
+  },
+  "source": {
+    "headBeforeCommit": "ff96c176d43f779a1b9dcc16942fe683a5c31586",
+    "uncommittedAtVerification": true,
+    "checkedFiles": 115,
+    "fullManifestSha256": "51941c1423b20e6c33625046fa1966721f9a5c6aeba1bd993869af37c99d7789",
+    "changed": [
+      {
+        "path": "apps/windows/src/views/Reader.vue",
+        "sha256": "ac0d070c0439300ec6d4a5e1cc4ed08958c14464f3dcf1d571cc3f6fbbabfa3c"
+      },
+      {
+        "path": "apps/windows/tests/regression.cjs",
+        "sha256": "48147e9dcd849f0e87c2435892dd9b8f502e26078bd09f538f605f0a8a10f5d8"
+      },
+      {
+        "path": "docs/maintenance.md",
+        "sha256": "7601e076e5c8cbf98c8adda6118abe09178e9e74759702b82e6bba5403b19ce3"
+      },
+      {
+        "path": "docs/maintenance_CN.md",
+        "sha256": "5b31ac35986c7f7579d2e83c58360f174688e62f1c5578611983ef63b8bb8686"
+      },
+      {
+        "path": "docs/worklog.md",
+        "sha256": "baacac6353450557429de4a1cccb3281cb82d8ae5227323730ebb603cc1c999a"
+      },
+      {
+        "path": "docs/worklog_CN.md",
+        "sha256": "992c7121bd367876a59d4bef4cdb6cf3b9d5bfa6691950fdd0f69f26af326433"
+      }
+    ]
+  },
+  "evidence": {
+    "identity": "2026-10-25T12-41-41-994Z-6508854a",
+    "receipt": "docs/evidence/2026-10-25T12-41-41-994Z-6508854a/receipt.json",
+    "sha256": "0dd9601cd703882dd83106577b8169ccbb906daa50b14f0f133403cd12a22c62",
+    "retention": "The full manifest, original receipt and raw logs remain local and are not promised in a fresh clone. This selected result is tracked."
+  },
+  "limitations": [
+    "The regressions execute actual reader/store code against simulated layout. Real desktop rendering, scroll clamping and font/layout behavior were not exercised.",
+    "Exact character or intra-paragraph restoration after reflow is not guaranteed; positions already overwritten by the old implementation cannot be reconstructed.",
+    "Two SAGA_SAMPLE-dependent original-book tests remain ignored in the default Rust suite.",
+    "No application was launched, live book modified, dependency installed or service changed.",
+    "No formal coverage/MC-DC, mutation, crash/power-loss or release qualification is established."
+  ]
+}

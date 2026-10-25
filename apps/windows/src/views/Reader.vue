@@ -53,41 +53,45 @@ const renderedChapters = ref<Section[]>([]);
 const isAppending = ref(false);
 const isPrepending = ref(false);
 const isJumping = ref(false);
+/** Shared reading-line distance from the viewport top, in CSS pixels. */
+const inset = 100;
 
+/** Associate the reading line with a paragraph, including gaps and trailing chapter space. */
+function locate(paragraphs: NodeListOf<HTMLElement>, position: number): number {
+  for (let index = 0; index < paragraphs.length; index++) {
+    if (paragraphs[index].getBoundingClientRect().bottom >= position) return index;
+  }
+  return Math.max(0, paragraphs.length - 1);
+}
+
+/** Restore the captured reading line; keep the paragraph authoritative after layout changes. */
 function restoreReadingPosition(): void {
   const el = readerViewportRef.value;
   if (!el || !activeBook.value) return;
 
   const targetParaIndex = activeBook.value.currentParagraphIndex ?? 0;
   const targetScrollRatio = activeBook.value.currentScrollRatio ?? 0;
-
-  if (targetParaIndex > 0) {
-    const activeChapterBlock = el.querySelector<HTMLElement>(
-      `.chapter-article-block[data-chapter-index="${activeBook.value.currentChapterIndex}"]`
-    );
-    if (activeChapterBlock) {
-      const paraElements = activeChapterBlock.querySelectorAll<HTMLElement>(".reader-para");
-      const targetPara = paraElements[targetParaIndex] || paraElements[paraElements.length - 1];
-      if (targetPara) {
-        targetPara.scrollIntoView({ block: "start", behavior: "auto" });
-        return;
-      }
-    }
+  if (targetParaIndex === 0 && targetScrollRatio === 0) {
+    el.scrollTop = 0;
+    return;
   }
-
-  if (targetScrollRatio > 0) {
-    const activeChapterBlock = el.querySelector<HTMLElement>(
-      `.chapter-article-block[data-chapter-index="${activeBook.value.currentChapterIndex}"]`
-    );
-    if (activeChapterBlock) {
-      const blockTop = activeChapterBlock.offsetTop;
-      const blockHeight = activeChapterBlock.offsetHeight;
-      el.scrollTop = blockTop + Math.round(blockHeight * targetScrollRatio);
-      return;
-    }
+  const block = el.querySelector<HTMLElement>(
+    `.chapter-article-block[data-chapter-index="${activeBook.value.currentChapterIndex}"]`
+  );
+  if (!block) {
+    el.scrollTop = 0;
+    return;
   }
-
-  el.scrollTop = 0;
+  const bounds = block.getBoundingClientRect();
+  const paragraphs = block.querySelectorAll<HTMLElement>(".reader-para");
+  const target = Math.max(0, Math.min(targetParaIndex, paragraphs.length - 1));
+  let position = bounds.top + bounds.height * targetScrollRatio;
+  if (paragraphs[target] && (targetScrollRatio === 0 || locate(paragraphs, position) !== target)) {
+    const paragraph = paragraphs[target].getBoundingClientRect();
+    // Stay inside the target even when the previous paragraph ends exactly at its top.
+    position = paragraph.top + Math.min(1, paragraph.height / 2);
+  }
+  el.scrollTop = Math.max(0, el.scrollTop + position - (el.getBoundingClientRect().top + inset));
 }
 
 function initRenderedChapters(): void {
@@ -269,7 +273,7 @@ function updateReadingPositionFromScroll(): void {
   if (!chapterBlocks || chapterBlocks.length === 0) return;
 
   const containerRect = el.getBoundingClientRect();
-  const detectionLine = containerRect.top + 100;
+  const detectionLine = containerRect.top + inset;
 
   for (const block of Array.from(chapterBlocks)) {
     const blockRect = block.getBoundingClientRect();
@@ -279,14 +283,7 @@ function updateReadingPositionFromScroll(): void {
       const chapterIdx = parseInt(idx, 10);
 
       const paragraphs = block.querySelectorAll<HTMLElement>(".reader-para");
-      let visibleParaIdx = 0;
-      for (let p = 0; p < paragraphs.length; p++) {
-        const pRect = paragraphs[p].getBoundingClientRect();
-        if (pRect.bottom >= detectionLine) {
-          visibleParaIdx = p;
-          break;
-        }
-      }
+      const visibleParaIdx = locate(paragraphs, detectionLine);
 
       const blockHeight = blockRect.height || 1;
       const blockOffset = Math.max(0, detectionLine - blockRect.top);

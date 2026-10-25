@@ -29,6 +29,7 @@ The linked documents own current facts. Earlier results describe their original 
 | 2026-10-24 | SPEECH-01: recorded the Windows portable speech audit, target hardware, fixed-voice/source-preservation constraints, and candidate engines; model execution and host qualification remain pending. | [Audit](speech.md), [tasks](tasks.md) |
 | 2026-10-24 | REVIEW-01: reviewed pending resident-storage and narration changes, blocked mouse history navigation during close-time saving, and reconciled English/Chinese documents before the authorized commit. | [Contracts and limits](maintenance.md#resident-catalog-and-bounded-progress-saving-resident-01), [review result](evidence/2026-10-24-review/result.json) |
 | 2026-10-24 | CLOSE-01: normal close now protects owned book deletions, including pending progress, duplicate requests, failure cleanup, and overlapping operations. | [Contract](maintenance.md#deletion-close-protection-close-01), [local result](evidence/2026-10-24-close/result.json) |
+| 2026-10-25 | RESTORE-01: unified reading-position capture/restoration coordinates, retained paragraph anchors after reflow, and corrected trailing-space paragraph selection. | [Contract](maintenance.md#stable-reading-position-restoration-restore-01), [local result](evidence/2026-10-25-restoration/result.json) |
 
 ## Historical archive
 
