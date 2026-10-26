@@ -1,0 +1,401 @@
+{
+  "version": 1,
+  "milestone": "STITCH-01",
+  "recordedAt": "2026-10-26T07:49:41.891Z",
+  "status": "fixed-local-verification",
+  "qualification": "not-qualified",
+  "trust": "local-unsealed",
+  "authorization": "User explicitly requested fixing the identified short-chapter continuation defect, then committing and pushing.",
+  "contract": "Fill the existing 700 CSS pixel forward buffer after initial rendering, chapter selection, chapter additions and layout changes, even if no scroll event can occur; stop at book end or defer a zero-height viewport, preserving the selected anchor and rejecting obsolete work.",
+  "implementation": {
+    "file": "apps/windows/src/views/Reader.vue",
+    "filling": "Measure after each Vue render and reuse existing chapter addition and pruning state.",
+    "resize": "Observe the viewport and reader card; coalesce notifications through one animation frame, disconnect and cancel on unmount.",
+    "compatibility": "No persisted field, native command, dependency, storage schema or book-format changes."
+  },
+  "counterexample": {
+    "identity": "2026-10-26T07-43-00-422Z-b07c3cc0-stitching",
+    "phase": "counterexample-before-fix",
+    "started": "2026-10-26T07:43:00.431Z",
+    "finished": "2026-10-26T07:43:01.188Z",
+    "durationMs": 756.5519,
+    "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\38192_1792936704167\\node.exe",
+    "args": [
+      "--test",
+      "--test-name-pattern=^reader stitching:",
+      "tests/regression.cjs"
+    ],
+    "cwd": "apps/windows",
+    "exitCode": 1,
+    "signal": null,
+    "error": null,
+    "source": [
+      {
+        "path": "apps/windows/src/views/Reader.vue",
+        "sha256": "ac0d070c0439300ec6d4a5e1cc4ed08958c14464f3dcf1d571cc3f6fbbabfa3c"
+      },
+      {
+        "path": "apps/windows/tests/regression.cjs",
+        "sha256": "394b6783da1bc7211a4462074d72201c61a161a86509125b52449c0aae00e14d"
+      }
+    ],
+    "logs": [
+      {
+        "path": "docs/evidence/2026-10-26T07-43-00-422Z-b07c3cc0-stitching/red.stdout.log",
+        "sha256": "d90c38dea4c528e36b98eab0b745353118d05bcd898de92c7ea159d6d064015a"
+      },
+      {
+        "path": "docs/evidence/2026-10-26T07-43-00-422Z-b07c3cc0-stitching/red.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "summary": {
+      "tests": 7,
+      "pass": 1,
+      "fail": 6,
+      "skipped": 0
+    },
+    "interpretation": "Six of seven new regressions failed before the fix; hidden/stale view protection already passed."
+  },
+  "attempts": [
+    {
+      "identity": "2026-10-26T07-46-38-473Z-77f0e1f9",
+      "receipt": {
+        "path": "docs/evidence/2026-10-26T07-46-38-473Z-77f0e1f9/receipt.json",
+        "sha256": "9e73dc21b75638b8307edc3594c3686930601684cb3f4bd59244a8f6ff16a6c9"
+      },
+      "passed": false,
+      "sourceUnchanged": true,
+      "checksPassed": 7,
+      "frontend": {
+        "tests": 85,
+        "pass": 84,
+        "fail": 1,
+        "skipped": 0
+      },
+      "diagnosis": "The content-resize fixture left 720 px of buffer, above the 700 px refill threshold; its expectation of another chapter was incorrect. All other checks and six stitching regressions passed."
+    },
+    {
+      "identity": "2026-10-26T07-48-28-998Z-c85e5d32-frontend",
+      "receipt": {
+        "path": "docs/evidence/2026-10-26T07-48-28-998Z-c85e5d32-frontend/receipt.json",
+        "sha256": "b1797a61628caa262a5bcfd0c6a6edd9fa89c41c56f77149801a8cb1773d039e"
+      },
+      "passed": true,
+      "sourceUnchanged": true,
+      "changedSincePrevious": [
+        "apps/windows/tests/regression.cjs"
+      ],
+      "reason": "Corrected the resize fixture from 720 px remaining space to 680 px, below the existing 700 px refill threshold; added an explicit precondition. Production code is unchanged from the full registered run."
+    }
+  ],
+  "verification": {
+    "checksPassed": 8,
+    "checks": [
+      {
+        "id": "runner",
+        "program": "node",
+        "cwd": ".",
+        "args": [
+          "--test",
+          "tools/check.test.cjs"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\38192_1792936704167\\node.exe",
+        "arguments": [
+          "--test",
+          "tools/check.test.cjs"
+        ],
+        "started": "2026-10-26T07:46:39.086Z",
+        "finished": "2026-10-26T07:46:39.727Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 306,
+        "passed": true,
+        "log": "runner.log",
+        "sha256": "b97b882fe95a12d0a2a6e324304e08c2c046109712c1bf9056cb03abfe820500",
+        "run": "2026-10-26T07-46-38-473Z-77f0e1f9"
+      },
+      {
+        "id": "format",
+        "program": "cargo",
+        "cwd": ".",
+        "args": [
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "timeoutMs": 30000,
+        "command": "rustup",
+        "arguments": [
+          "run",
+          "1.98.0",
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "started": "2026-10-26T07:46:39.727Z",
+        "finished": "2026-10-26T07:46:40.191Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 0,
+        "passed": true,
+        "log": "format.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "run": "2026-10-26T07-46-38-473Z-77f0e1f9"
+      },
+      {
+        "id": "clippy",
+        "program": "cargo",
+        "cwd": ".",
+        "args": [
+          "clippy",
+          "--offline",
+          "--locked",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "timeoutMs": 180000,
+        "command": "rustup",
+        "arguments": [
+          "run",
+          "1.98.0",
+          "cargo",
+          "clippy",
+          "--offline",
+          "--locked",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "started": "2026-10-26T07:46:40.192Z",
+        "finished": "2026-10-26T07:46:51.981Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 73,
+        "passed": true,
+        "log": "clippy.log",
+        "sha256": "44814ad5b383479881a88d72d539eacbdaeebc9b6431bbfd3160c7075a35dc90",
+        "run": "2026-10-26T07-46-38-473Z-77f0e1f9"
+      },
+      {
+        "id": "rust",
+        "program": "cargo",
+        "cwd": ".",
+        "args": [
+          "test",
+          "--offline",
+          "--locked",
+          "--workspace"
+        ],
+        "timeoutMs": 180000,
+        "command": "rustup",
+        "arguments": [
+          "run",
+          "1.98.0",
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "--workspace"
+        ],
+        "started": "2026-10-26T07:46:51.983Z",
+        "finished": "2026-10-26T07:47:07.668Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 7890,
+        "passed": true,
+        "log": "rust.log",
+        "sha256": "90c7a16423054269d29aa9586384240eff8244b0cfa65000abf69c7f1ecff371",
+        "run": "2026-10-26T07-46-38-473Z-77f0e1f9"
+      },
+      {
+        "id": "style",
+        "program": "node",
+        "cwd": "apps/windows",
+        "args": [
+          "tools/style.cjs"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\38192_1792936704167\\node.exe",
+        "arguments": [
+          "tools/style.cjs"
+        ],
+        "started": "2026-10-26T07:47:07.668Z",
+        "finished": "2026-10-26T07:47:07.964Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 68,
+        "passed": true,
+        "log": "style.log",
+        "sha256": "c57bd349e513259ba4751b7116f3ddf52618c66895e4867984e214ee8ba2536e",
+        "run": "2026-10-26T07-46-38-473Z-77f0e1f9"
+      },
+      {
+        "id": "frontend",
+        "program": "node",
+        "cwd": "apps/windows",
+        "args": [
+          "--test",
+          "tests/*.cjs"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\38192_1792936704167\\node.exe",
+        "arguments": [
+          "--test",
+          "tests/*.cjs"
+        ],
+        "started": "2026-10-26T07:48:29.048Z",
+        "finished": "2026-10-26T07:48:30.554Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 8037,
+        "passed": true,
+        "log": "frontend.log",
+        "sha256": "5eb80c787ad521d246063122134de2c05fc018aecec97abdf50afddb07809541",
+        "run": "2026-10-26T07-48-28-998Z-c85e5d32-frontend"
+      },
+      {
+        "id": "types",
+        "program": "node",
+        "cwd": "apps/windows",
+        "args": [
+          "node_modules/vue-tsc/bin/vue-tsc.js",
+          "--noEmit"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\38192_1792936704167\\node.exe",
+        "arguments": [
+          "node_modules/vue-tsc/bin/vue-tsc.js",
+          "--noEmit"
+        ],
+        "started": "2026-10-26T07:47:09.464Z",
+        "finished": "2026-10-26T07:47:13.246Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 0,
+        "passed": true,
+        "log": "types.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "run": "2026-10-26T07-46-38-473Z-77f0e1f9"
+      },
+      {
+        "id": "build",
+        "program": "node",
+        "cwd": "apps/windows",
+        "args": [
+          "node_modules/vite/bin/vite.js",
+          "build"
+        ],
+        "timeoutMs": 30000,
+        "command": "C:\\Users\\Ethan\\AppData\\Local\\fnm_multishells\\38192_1792936704167\\node.exe",
+        "arguments": [
+          "node_modules/vite/bin/vite.js",
+          "build"
+        ],
+        "started": "2026-10-26T07:47:13.247Z",
+        "finished": "2026-10-26T07:47:15.578Z",
+        "exitCode": 0,
+        "signal": null,
+        "termination": "exited",
+        "error": null,
+        "bytes": 977,
+        "passed": true,
+        "log": "build.log",
+        "sha256": "798135662fca5ee102ae157bc0ca3197a38fb16ece7f967843a860e34f81c2a3",
+        "run": "2026-10-26T07-46-38-473Z-77f0e1f9"
+      }
+    ],
+    "frontend": {
+      "tests": 85,
+      "pass": 85,
+      "fail": 0,
+      "skipped": 0
+    },
+    "runner": {
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0
+    },
+    "rust": {
+      "passed": 88,
+      "failed": 0,
+      "ignored": 2
+    },
+    "regressions": [
+      "✔ reader stitching: opening a short chapter fills the viewport buffer without a scroll event (225.7587ms)",
+      "✔ reader stitching: consecutive short and empty chapters fill only the required buffer (102.3847ms)",
+      "✔ reader stitching: a short whole book stops at its final chapter (75.7191ms)",
+      "✔ reader stitching: jumping into a short chapter fills forward without moving its anchor (38.3849ms)",
+      "✔ reader stitching: one bottom scroll continues through several short chapters (37.3714ms)",
+      "✔ reader stitching: viewport and content resize refill the buffer and release observers on teardown (31.8724ms)",
+      "✔ reader stitching: hidden viewports and obsolete render callbacks cannot append chapters (35.2103ms)"
+    ],
+    "environment": {
+      "platform": "win32",
+      "architecture": "x64",
+      "node": "v24.18.0",
+      "rust": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+      "typescript": "5.9.3"
+    },
+    "reuse": "Seven successful checks from the full registered run are retained. Only the test fixture changed afterward, so the full frontend suite alone was rerun using the registered command and exported bounded runner. Production and documentation bytes are identical across both runs.",
+    "source": [
+      {
+        "path": "apps/windows/src/views/Reader.vue",
+        "sha256": "fbeb7323265dd2659336be98d986afc2a325311d374dcd56012ba0a6c83f3d99"
+      },
+      {
+        "path": "apps/windows/tests/regression.cjs",
+        "sha256": "1ad10fb43151e04590de65d180d4066e8e5fa396d5b5c000b5a034b778c8dcad"
+      },
+      {
+        "path": "docs/maintenance.md",
+        "sha256": "a899d3a233deab52aaebda23d3736edf2dbfe7d68d5ae60020e957e202f8d4da"
+      },
+      {
+        "path": "docs/maintenance_CN.md",
+        "sha256": "0d1766c217a09ba8a572e8864c68f1cedc2d3b70e947f4246c9324ede3a5aa5e"
+      },
+      {
+        "path": "docs/worklog.md",
+        "sha256": "fcf278c1d67ec1ba4610afb281c47c6d60f8e1feea30c654928e5075ddd124e3"
+      },
+      {
+        "path": "docs/worklog_CN.md",
+        "sha256": "9164bf5062584df63ccbee35da3b6864f613c1e102e7a5fa070e76201641e1ef"
+      }
+    ],
+    "sourceFileCount": 115,
+    "sourceManifestSha256": "c07c1744b554f7119585e306400afedca488e791a7bea51547808d668c9522df",
+    "sourceUnchangedDuringRuns": true
+  },
+  "limitations": [
+    "Actual reader/store code uses simulated layout, scrolling and resize delivery; real Windows desktop interaction remains unqualified.",
+    "Two original-book Rust tests remain ignored under the default registered suite.",
+    "Large individual chapters remain fully rendered; no hard DOM, memory or latency bound is asserted.",
+    "Raw logs and complete execution manifests remain local diagnostic material, preserved at the referenced paths and not promised as Git backups."
+  ]
+}

@@ -30,6 +30,7 @@
 | 2026-10-24 | REVIEW-01：审核待提交的常驻存储与朗读改动，阻断关闭保存期间的鼠标历史导航，并在已获授权的提交前校准中英文文档。 | [契约与限制](maintenance_CN.md#常驻书架目录与有界进度保存resident-01)、[审核结果](evidence/2026-10-24-review/result.json) |
 | 2026-10-24 | CLOSE-01：正常关闭现保护进行中的书籍删除，覆盖待完成的进度写入、重复请求、失败清理及重叠操作。 | [契约](maintenance_CN.md#删除期间的关闭保护close-01)、[本地结果](evidence/2026-10-24-close/result.json) |
 | 2026-10-25 | RESTORE-01：统一阅读位置采集与恢复坐标，重新排版后保留段落锚点，并修正章末空白的段落选择。 | [契约](maintenance_CN.md#稳定的阅读位置恢复restore-01)、[本地结果](evidence/2026-10-25-restoration/result.json) |
+| 2026-10-26 | STITCH-01：连续阅读无需等待滚动事件即可补充短章节/空章节，在布局变化后再次补充，并在卸载时释放尺寸变化回调。 | [契约](maintenance_CN.md#短章节的连续阅读stitch-01)、[本地结果](evidence/2026-10-26-stitching/result.json) |
 
 ## 历史归档
 

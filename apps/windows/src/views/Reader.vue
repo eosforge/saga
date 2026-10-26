@@ -26,6 +26,8 @@ const readerViewportRef = ref<HTMLElement | null>(null);
 let disposed = false;
 let generation = 0;
 let jumping: ReturnType<typeof setTimeout> | null = null;
+let observer: ResizeObserver | null = null;
+let frame: number | null = null;
 const fontSize = ref(20);
 const isTocVisible = ref(true);
 const tocSearchQuery = ref("");
@@ -111,6 +113,17 @@ function initRenderedChapters(): void {
   nextTick(() => {
     if (disposed || generation !== token) return;
     restoreReadingPosition();
+    if (typeof ResizeObserver !== "undefined") {
+      observer ??= new ResizeObserver(resize);
+      observer.disconnect();
+      const viewport = readerViewportRef.value;
+      if (viewport) {
+        observer.observe(viewport);
+        const card = viewport.querySelector(".reader-card");
+        if (card) observer.observe(card);
+      }
+    }
+    fill();
     const activeTocRow = document.querySelector<HTMLElement>(".chapter-row.active");
     if (activeTocRow) {
       activeTocRow.scrollIntoView({ block: "nearest" });
@@ -170,6 +183,7 @@ async function onSelectChapter(index: number): Promise<void> {
     if (el) {
       el.scrollTop = 0;
     }
+    fill();
     const activeTocRow = document.querySelector<HTMLElement>(".chapter-row.active");
     if (activeTocRow) {
       activeTocRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -197,6 +211,22 @@ async function handleNextChapter(): Promise<void> {
   }
 }
 
+/** Fill the forward buffer even when short content cannot produce a scroll event. */
+function fill(): void {
+  const viewport = readerViewportRef.value;
+  if (disposed || !viewport || viewport.clientHeight <= 0 || isAppending.value || isPrepending.value) return;
+  if (viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 700) appendNextChapter();
+}
+
+/** Defer layout-driven additions outside ResizeObserver delivery and coalesce the same frame. */
+function resize(): void {
+  if (disposed || frame !== null) return;
+  frame = requestAnimationFrame(() => {
+    frame = null;
+    fill();
+  });
+}
+
 function appendNextChapter(): void {
   if (disposed || isAppending.value || isPrepending.value || !activeBook.value?.sections) return;
   const token = generation;
@@ -211,6 +241,7 @@ function appendNextChapter(): void {
     nextTick(() => {
       if (disposed || generation !== token) return;
       isAppending.value = false;
+      fill();
       trim();
     });
   }
@@ -236,6 +267,7 @@ function prependPrevChapter(): void {
       const heightDiff = newScrollHeight - oldScrollHeight;
       el.scrollTop = oldScrollTop + heightDiff;
       isPrepending.value = false;
+      fill();
       trim();
     });
   }
@@ -309,10 +341,7 @@ function handleViewportScroll(): void {
   if (!el || !activeBook.value?.sections) return;
 
   // 1. Auto-stitch next chapter when nearing bottom (within 700px)
-  const scrollBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-  if (scrollBottom < 700 && !isAppending.value) {
-    appendNextChapter();
-  }
+  fill();
 
   // 2. Auto-stitch previous chapter when nearing top (within 200px) with height compensation
   if (el.scrollTop < 200 && !isPrepending.value) {
@@ -419,6 +448,10 @@ onUnmounted(() => {
   ++generation;
   if (jumping !== null) clearTimeout(jumping);
   jumping = null;
+  observer?.disconnect();
+  observer = null;
+  if (frame !== null) cancelAnimationFrame(frame);
+  frame = null;
   void flushReadingProgress().catch(() => { });
   window.removeEventListener("keydown", handleKeydown);
   window.removeEventListener("pointerdown", dismiss);

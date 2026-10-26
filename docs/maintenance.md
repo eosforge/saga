@@ -66,6 +66,14 @@ The saved chapter ratio preserves the position within a paragraph or its precedi
 
 Seven controlled-layout regressions cover repeated reopening of a long first paragraph, short paragraphs and gaps, differing offset parents and viewport positions, reflow, paragraph-only anchors without margins, initial/empty chapters, and trailing chapter space. Six failed against the previous implementation; the initial/empty case already passed. [The RESTORE-01 result](evidence/2026-10-25-restoration/result.json) records final checks and source identities. These tests execute actual reader/store code with simulated layout; real desktop rendering and font/layout behavior remain unqualified.
 
+## Continuous reading through short chapters (STITCH-01)
+
+The 2026-10-26 repair removes the dependency on a scroll event to load the next chapter. Initial rendering, chapter selection, and completed chapter additions check the remaining scroll space and append forward until the existing 700 px buffer is filled or the book ends. A short or empty chapter therefore cannot strand continuous reading merely because it fits within the viewport. Each addition waits for Vue's next rendered layout before measuring again; zero-height viewports defer filling, and generation/disposal guards reject obsolete callbacks. Appending does not select the appended chapter or move the current reading anchor. Existing offscreen trimming remains in place; a very large chapter is still rendered in full.
+
+A ResizeObserver watches the viewport and reader card so window, width, and text-size changes can request another fill. Notifications share one animation-frame callback, keeping layout-driven additions outside observer delivery. Unmount disconnects the observer and cancels the pending frame. This uses existing reader state and introduces no persistence, native command, or book-format change.
+
+Seven controlled-layout regressions cover first opening, consecutive short/empty chapters, a short whole book, chapter selection, successive additions after one bottom scroll, viewport/content resizing and observer cleanup, and hidden/stale/disposed views. Six first failed against the previous implementation; hidden/stale callback protection already passed. [The STITCH-01 result](evidence/2026-10-26-stitching/result.json) records verification and source identities. Tests execute actual reader/store code with simulated layout and resize delivery; real desktop layout and resize behavior remain unqualified.
+
 ## Local checks
 
 [development.json](../development.json) is a version-1 local-feedback registry validated by [tools/check.cjs](../tools/check.cjs). It records component consequence levels, the verified environment, commands, and per-process deadlines in milliseconds. Classifying a component does not establish that its obligations passed.

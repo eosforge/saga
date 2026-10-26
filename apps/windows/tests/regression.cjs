@@ -47,7 +47,7 @@ function chapter(index, chunks = true) {
 function novel(count = 3) {
   return { book: { id: 'book', title: 'Fixture', author: 'Author', description: '', chapters: count }, sections: Array.from({ length: count }, (_, i) => chapter(i)) };
 }
-function component(name, library, exposed, native = true) {
+function component(name, library, exposed, native = true, environment = {}) {
   const source = fs.readFileSync(path.join(root, 'src/views', name + '.vue'), 'utf8').match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1];
   const code = ts.transpileModule(source + '\nexport { ' + exposed + ' };', { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const exports = {}, clock = timers(), events = [], lifecycle = {};
@@ -55,7 +55,7 @@ function component(name, library, exposed, native = true) {
   const window = { addEventListener() { }, removeEventListener() { } };
   vm.runInNewContext(code, {
 exports, console: { warn() { }, error() { } }, defineEmits: () => event => events.push(event), ...clock,
-    document, window,
+    document, window, ...environment,
     require(dependency) {
       if (dependency === 'vue') return { ...vue, onMounted: cb => { lifecycle.mount = cb; }, onUnmounted: cb => { lifecycle.unmount = cb; }, watch() { } };
       if (dependency === '../stores/library') return library;
@@ -111,6 +111,144 @@ function reading(heights, gap = 26) {
   ui.readerViewportRef.value = vue.markRaw(viewport);
   return { ...ui, store, layout, viewport, height, start };
 }
+
+/** Model clamped scrolling and layout notifications without inventing scroll events for short content. */
+function stitching(heights, height = 800) {
+  const { store } = graph(async () => { throw Error('unexpected native call'); }, false);
+  const book = novel(heights.length);
+  book.sections.forEach((section, index) => { section.body = index % 2 ? '' : 'Short body.'; section.chunks = []; });
+  store.importNovel(book);
+  const observers = [];
+  const frames = timers();
+  class ResizeObserver {
+    constructor(callback) { this.callback = callback; this.targets = new Set(); observers.push(this); }
+    observe(target) { this.targets.add(target); }
+    disconnect() { this.targets.clear(); }
+  }
+  const ui = component('Reader', store, 'readerViewportRef, renderedChapters, handleViewportScroll, onSelectChapter, initRenderedChapters, isBookFinished', false, {
+    ResizeObserver, requestAnimationFrame: frames.setTimeout, cancelAnimationFrame: frames.clearTimeout,
+  });
+  const layout = { height, heights };
+  const card = {};
+  let scroll = 0;
+  const viewport = {
+    get clientHeight() { return layout.height; },
+    get scrollHeight() { return Math.max(layout.height, 280 + ui.renderedChapters.value.reduce((sum, section) => sum + layout.heights[section.index], 0)); },
+    get scrollTop() { return scroll; },
+    set scrollTop(value) { scroll = Math.max(0, Math.min(value, this.scrollHeight - this.clientHeight)); },
+    getBoundingClientRect() { return { top: 0, bottom: layout.height }; },
+    querySelector(selector) { return selector === '.reader-card' ? card : null; },
+    querySelectorAll() {
+      let offset = 140;
+      return Array.from(ui.renderedChapters.value, section => {
+        const top = offset; offset += layout.heights[section.index];
+        return { dataset: { chapterIndex: String(section.index) }, querySelectorAll: () => [],
+          getBoundingClientRect: () => ({ top: top - scroll, bottom: top + layout.heights[section.index] - scroll, height: layout.heights[section.index] }) };
+      });
+    },
+  };
+  ui.readerViewportRef.value = vue.markRaw(viewport);
+  async function settle() { for (let tick = 0; tick < heights.length + 4; tick++) await vue.nextTick(); }
+  async function resize() { for (const observer of observers) if (observer.targets.size) observer.callback([]); frames.run(); await settle(); }
+  return { ...ui, store, viewport, layout, observers, frames, settle, resize, indices: () => Array.from(ui.renderedChapters.value, section => section.index) };
+}
+
+test('reader stitching: opening a short chapter fills the viewport buffer without a scroll event', async () => {
+  const ui = stitching([120, 1800, 1800]);
+  try {
+    await ui.lifecycle.mount(); await ui.settle();
+    assert.deepEqual(ui.indices(), [0, 1]);
+    assert.equal(ui.viewport.scrollTop, 0);
+    assert.equal(ui.store.activeBook.value.currentChapterIndex, 0);
+    assert.ok(ui.viewport.scrollHeight - ui.viewport.clientHeight >= 700);
+  } finally { ui.lifecycle.unmount(); }
+});
+
+test('reader stitching: consecutive short and empty chapters fill only the required buffer', async () => {
+  const ui = stitching(Array(20).fill(120));
+  try {
+    await ui.lifecycle.mount(); await ui.settle();
+    assert.deepEqual(ui.indices(), Array.from({ length: 11 }, (_, index) => index));
+    assert.equal(ui.isBookFinished.value, false);
+    assert.equal(ui.viewport.scrollTop, 0);
+  } finally { ui.lifecycle.unmount(); }
+});
+
+test('reader stitching: a short whole book stops at its final chapter', async () => {
+  const ui = stitching([80, 80, 80]);
+  try {
+    await ui.lifecycle.mount(); await ui.settle();
+    assert.deepEqual(ui.indices(), [0, 1, 2]);
+    assert.equal(ui.isBookFinished.value, true);
+    assert.equal(ui.viewport.scrollHeight, ui.viewport.clientHeight);
+  } finally { ui.lifecycle.unmount(); }
+});
+
+test('reader stitching: jumping into a short chapter fills forward without moving its anchor', async () => {
+  const ui = stitching([2000, 120, 120, 2000, 2000]);
+  try {
+    await ui.lifecycle.mount(); await ui.settle();
+    await ui.onSelectChapter(1); await ui.settle(); ui.clock.run();
+    assert.deepEqual(ui.indices(), [1, 2, 3]);
+    assert.equal(ui.viewport.scrollTop, 0);
+    assert.equal(ui.store.activeBook.value.currentChapterIndex, 1);
+    assert.equal(ui.store.activeBook.value.currentScrollRatio, 0);
+  } finally { ui.lifecycle.unmount(); }
+});
+
+test('reader stitching: one bottom scroll continues through several short chapters', async () => {
+  const ui = stitching([2000, 100, 100, 1800, 1800]);
+  try {
+    await ui.lifecycle.mount(); await ui.settle();
+    assert.deepEqual(ui.indices(), [0]);
+    ui.viewport.scrollTop = 10000;
+    const anchor = ui.viewport.scrollTop;
+    ui.handleViewportScroll(); await ui.settle();
+    assert.deepEqual(ui.indices(), [0, 1, 2, 3]);
+    assert.equal(ui.viewport.scrollTop, anchor);
+  } finally { ui.lifecycle.unmount(); }
+});
+
+test('reader stitching: viewport and content resize refill the buffer and release observers on teardown', async () => {
+  const ui = stitching([1200, 120, 1800, 1800], 400);
+  try {
+    await ui.lifecycle.mount(); await ui.settle();
+    assert.deepEqual(ui.indices(), [0]);
+    ui.layout.height = 1000;
+    await ui.resize();
+    assert.deepEqual(ui.indices(), [0, 1, 2]);
+    ui.layout.heights[2] = 80;
+    assert.ok(ui.viewport.scrollHeight - ui.viewport.clientHeight < 700, 'content resize must leave the forward buffer underfilled');
+    await ui.resize();
+    assert.deepEqual(ui.indices(), [0, 1, 2, 3]);
+    assert.equal(ui.observers[0].targets.size, 2);
+    ui.observers[0].callback([]); ui.observers[0].callback([]);
+    assert.equal(ui.frames.callbacks.size, 1);
+    ui.lifecycle.unmount();
+    assert.equal(ui.observers[0].targets.size, 0);
+    assert.equal(ui.frames.callbacks.size, 0);
+    const before = ui.indices();
+    ui.observers[0].callback([]); ui.frames.run(); await ui.settle();
+    assert.deepEqual(ui.indices(), before);
+    assert.equal(ui.frames.callbacks.size, 0);
+  } finally { ui.lifecycle.unmount(); }
+});
+
+test('reader stitching: hidden viewports and obsolete render callbacks cannot append chapters', async () => {
+  const ui = stitching([120, 120, 120, 2000], 0);
+  try {
+    await ui.lifecycle.mount(); await ui.settle();
+    assert.deepEqual(ui.indices(), [0]);
+    ui.layout.height = 800;
+    ui.initRenderedChapters();
+    await ui.onSelectChapter(3); await ui.settle();
+    assert.deepEqual(ui.indices(), [3]);
+    ui.store.activeBook.value.currentChapterIndex = 0;
+    ui.initRenderedChapters();
+    ui.lifecycle.unmount(); await ui.settle();
+    assert.deepEqual(ui.indices(), [0]);
+  } finally { ui.lifecycle.unmount(); }
+});
 test('audit: merged body must match text displayed before and after reload', async () => {
   const ui = audit([chapter(0), chapter(1, false)]);
   ui.openPopoverForSection(ui.sections.value[1]);
