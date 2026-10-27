@@ -74,6 +74,14 @@ A ResizeObserver watches the viewport and reader card so window, width, and text
 
 Seven controlled-layout regressions cover first opening, consecutive short/empty chapters, a short whole book, chapter selection, successive additions after one bottom scroll, viewport/content resizing and observer cleanup, and hidden/stale/disposed views. Six first failed against the previous implementation; hidden/stale callback protection already passed. [The STITCH-01 result](evidence/2026-10-26-stitching/result.json) records verification and source identities. Tests execute actual reader/store code with simulated layout and resize delivery; real desktop layout and resize behavior remain unqualified.
 
+## Chapter-end restoration (RESTORE-02)
+
+The 2026-10-27 repair keeps the saved chapter/paragraph/ratio authoritative while the reader rebuilds the scroll range. If restoration is clipped by the currently rendered content, the existing forward-addition path appends the next chapter and retries after Vue renders it. Retries stop when the requested offset is reached within 0.5 CSS pixels or no following chapter remains. A zero-height viewport defers restoration until the existing resize observer can request it again. At the actual book end, an unreachable offset uses the available range and normal scroll capture resumes.
+
+Scroll detection cannot replace the saved anchor while restoration is pending, including between short-chapter additions. Chapter selection cancels that restoration; existing generation and disposal checks prevent obsolete callbacks from extending the new selection or writing after unmount. Successful restoration continues the existing 700 px forward-buffer filling. The saved fields and storage format remain unchanged.
+
+Seven new regressions use actual reader/store code with clamped simulated scrolling, paragraph rectangles, and controlled resize/scroll delivery. They cover repeated reopening without extra acknowledged progress writes, several short following chapters, a later saved chapter, hidden viewports, a final-chapter range limit, chapter-selection supersession, and unmount. Six failed before the fix; selection supersession already passed. [The RESTORE-02 result](evidence/2026-10-27-ending/result.json) records verification and source identities. Real desktop rendering/event timing and precise character restoration after reflow remain unqualified; earlier results retain their original scope.
+
 ## Local checks
 
 [development.json](../development.json) is a version-1 local-feedback registry validated by [tools/check.cjs](../tools/check.cjs). It records component consequence levels, the verified environment, commands, and per-process deadlines in milliseconds. Classifying a component does not establish that its obligations passed.

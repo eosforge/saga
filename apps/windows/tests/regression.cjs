@@ -113,10 +113,14 @@ function reading(heights, gap = 26) {
 }
 
 /** Model clamped scrolling and layout notifications without inventing scroll events for short content. */
-function stitching(heights, height = 800) {
-  const { store } = graph(async () => { throw Error('unexpected native call'); }, false);
+function stitching(heights, height = 800, options = {}) {
+  const { store } = graph(options.invoke || (async () => { throw Error('unexpected native call'); }), !!options.invoke);
   const book = novel(heights.length);
-  book.sections.forEach((section, index) => { section.body = index % 2 ? '' : 'Short body.'; section.chunks = []; });
+  const counts = heights.map(value => Math.min(options.paragraphs || 0, Math.max(0, Math.floor((value - 102) / 68) + 1)));
+  book.sections.forEach((section, index) => {
+    section.body = options.paragraphs ? Array.from({ length: counts[index] }, (_, paragraph) => 'Paragraph ' + paragraph + '.').join('\n') : index % 2 ? '' : 'Short body.';
+    section.chunks = [];
+  });
   store.importNovel(book);
   const observers = [];
   const frames = timers();
@@ -125,25 +129,35 @@ function stitching(heights, height = 800) {
     observe(target) { this.targets.add(target); }
     disconnect() { this.targets.clear(); }
   }
-  const ui = component('Reader', store, 'readerViewportRef, renderedChapters, handleViewportScroll, onSelectChapter, initRenderedChapters, isBookFinished', false, {
+  const ui = component('Reader', store, 'readerViewportRef, renderedChapters, handleViewportScroll, onSelectChapter, initRenderedChapters, updateReadingPositionFromScroll, isBookFinished', false, {
     ResizeObserver, requestAnimationFrame: frames.setTimeout, cancelAnimationFrame: frames.clearTimeout,
   });
   const layout = { height, heights };
+  const padding = options.padding ?? 140;
   const card = {};
   let scroll = 0;
   const viewport = {
     get clientHeight() { return layout.height; },
-    get scrollHeight() { return Math.max(layout.height, 280 + ui.renderedChapters.value.reduce((sum, section) => sum + layout.heights[section.index], 0)); },
-    get scrollTop() { return scroll; },
-    set scrollTop(value) { scroll = Math.max(0, Math.min(value, this.scrollHeight - this.clientHeight)); },
+    get scrollHeight() { return Math.max(layout.height, padding * 2 + ui.renderedChapters.value.reduce((sum, section) => sum + layout.heights[section.index], 0)); },
+    get scrollTop() { scroll = Math.max(0, Math.min(scroll, this.scrollHeight - this.clientHeight)); return scroll; },
+    set scrollTop(value) {
+      const previous = scroll;
+      scroll = Math.max(0, Math.min(value, this.scrollHeight - this.clientHeight));
+      if (scroll !== previous) options.onScroll?.(ui);
+    },
     getBoundingClientRect() { return { top: 0, bottom: layout.height }; },
-    querySelector(selector) { return selector === '.reader-card' ? card : null; },
+    querySelector(selector) {
+      return selector === '.reader-card' ? card : this.querySelectorAll().find(block => selector.includes('"' + block.dataset.chapterIndex + '"')) || null;
+    },
     querySelectorAll() {
-      let offset = 140;
+      let offset = padding;
       return Array.from(ui.renderedChapters.value, section => {
         const top = offset; offset += layout.heights[section.index];
-        return { dataset: { chapterIndex: String(section.index) }, querySelectorAll: () => [],
-          getBoundingClientRect: () => ({ top: top - scroll, bottom: top + layout.heights[section.index] - scroll, height: layout.heights[section.index] }) };
+        const paragraphs = Array.from({ length: counts[section.index] }, (_, index) => ({
+          getBoundingClientRect: () => ({ top: top + 60 + index * 68 - viewport.scrollTop, bottom: top + 102 + index * 68 - viewport.scrollTop, height: 42 }),
+        }));
+        return { dataset: { chapterIndex: String(section.index) }, querySelectorAll: () => paragraphs,
+          getBoundingClientRect: () => ({ top: top - viewport.scrollTop, bottom: top + layout.heights[section.index] - viewport.scrollTop, height: layout.heights[section.index] }) };
       });
     },
   };
@@ -152,6 +166,118 @@ function stitching(heights, height = 800) {
   async function resize() { for (const observer of observers) if (observer.targets.size) observer.callback([]); frames.run(); await settle(); }
   return { ...ui, store, viewport, layout, observers, frames, settle, resize, indices: () => Array.from(ui.renderedChapters.value, section => section.index) };
 }
+
+/** Capture an end-of-chapter anchor while following content makes its offset reachable. */
+function ending(heights = [2200, 2200, 2200], height = 600, index = 0) {
+  const writes = [];
+  let observing = false;
+  const ui = stitching(heights, height, {
+    paragraphs: 30, padding: 80,
+    invoke: async (command, payload) => { assert.equal(command, 'update_reading_progress'); writes.push(payload); },
+    onScroll: reader => { if (observing) reader.updateReadingPositionFromScroll(); },
+  });
+  ui.renderedChapters.value = ui.store.activeBook.value.sections.slice(index);
+  ui.viewport.scrollTop = 2050;
+  ui.updateReadingPositionFromScroll();
+  const anchor = () => ({ chapter: ui.store.activeBook.value.currentChapterIndex, paragraph: ui.store.activeBook.value.currentParagraphIndex, ratio: ui.store.activeBook.value.currentScrollRatio });
+  const saved = anchor();
+  assert.equal(saved.chapter, index); assert.equal(saved.paragraph, 29);
+  ui.viewport.scrollTop = 0;
+  observing = true;
+  return { ...ui, writes, anchor, saved };
+}
+
+test('reader ending: repeated reopening preserves the reachable chapter-end offset and acknowledged progress', async () => {
+  const ui = ending();
+  try {
+    await ui.store.flushReadingProgress();
+    for (let repeat = 0; repeat < 4; repeat++) {
+      ui.initRenderedChapters();
+      await ui.settle();
+      assert.equal(ui.viewport.scrollTop, 2050);
+      ui.updateReadingPositionFromScroll();
+      assert.deepEqual(ui.anchor(), ui.saved);
+      await ui.store.flushReadingProgress();
+    }
+    assert.equal(ui.writes.length, 1, 'restoration must not persist a clamped intermediate anchor');
+  } finally { ui.lifecycle.unmount(); }
+});
+
+test('reader ending: restoration can wait through several short following chapters', async () => {
+  const ui = ending([2200, 80, 80, 80, 80, 2200], 1100);
+  try {
+    ui.initRenderedChapters();
+    for (let tick = 0; tick < 12; tick++) {
+      await vue.nextTick();
+      ui.updateReadingPositionFromScroll();
+      assert.deepEqual(ui.anchor(), ui.saved, 'an intermediate layout replaced the original anchor');
+    }
+    assert.equal(ui.viewport.scrollTop, 2050);
+    assert.deepEqual(ui.indices(), [0, 1, 2, 3, 4, 5]);
+  } finally { ui.lifecycle.unmount(); }
+});
+
+test('reader ending: reopening a later chapter restores that chapter rather than selecting its appended successor', async () => {
+  const ui = ending([2200, 2200, 2200], 600, 1);
+  try {
+    ui.initRenderedChapters(); await ui.settle();
+    assert.equal(ui.viewport.scrollTop, 2050);
+    assert.deepEqual(ui.anchor(), ui.saved);
+    assert.deepEqual(ui.indices(), [1, 2]);
+  } finally { ui.lifecycle.unmount(); }
+});
+
+test('reader ending: a hidden viewport defers restoration without replacing the saved anchor', async () => {
+  const ui = ending();
+  try {
+    ui.layout.height = 0;
+    ui.initRenderedChapters(); await ui.settle();
+    ui.updateReadingPositionFromScroll();
+    assert.deepEqual(ui.anchor(), ui.saved);
+    assert.deepEqual(ui.indices(), [0]);
+    ui.layout.height = 600;
+    await ui.resize();
+    assert.equal(ui.viewport.scrollTop, 2050);
+    assert.deepEqual(ui.anchor(), ui.saved);
+  } finally { ui.lifecycle.unmount(); }
+});
+
+test('reader ending: an unreachable final-chapter offset stops at the real end and releases scroll capture', async () => {
+  const ui = ending();
+  try {
+    ui.store.activeBook.value.currentChapterIndex = 2;
+    ui.initRenderedChapters(); await ui.settle();
+    assert.deepEqual(ui.indices(), [2]);
+    assert.equal(ui.viewport.scrollTop, 1760);
+    assert.equal(ui.store.activeBook.value.currentParagraphIndex, 29, 'the programmatic clamp must not overwrite the requested paragraph');
+    ui.viewport.scrollTop = 1500;
+    assert.equal(ui.store.activeBook.value.currentParagraphIndex, 21, 'normal scrolling must resume after the final chapter');
+  } finally { ui.lifecycle.unmount(); }
+});
+
+test('reader ending: chapter selection supersedes pending restoration', async () => {
+  const ui = ending();
+  try {
+    ui.initRenderedChapters();
+    await ui.onSelectChapter(2); await ui.settle(); ui.clock.run();
+    assert.deepEqual(ui.indices(), [2]);
+    assert.equal(ui.viewport.scrollTop, 0);
+    assert.equal(ui.store.activeBook.value.currentChapterIndex, 2);
+    assert.equal(ui.store.activeBook.value.currentParagraphIndex, 0);
+    ui.viewport.scrollTop = 1500;
+    assert.equal(ui.store.activeBook.value.currentParagraphIndex, 21);
+  } finally { ui.lifecycle.unmount(); }
+});
+
+test('reader ending: unmount prevents pending restoration from appending or replacing progress', async () => {
+  const ui = ending([2200, 80, 80, 80, 80, 2200], 1100);
+  ui.initRenderedChapters(); await vue.nextTick();
+  ui.lifecycle.unmount();
+  const rendered = ui.indices();
+  await ui.settle();
+  assert.deepEqual(ui.indices(), rendered);
+  assert.deepEqual(ui.anchor(), ui.saved);
+});
 
 test('reader stitching: opening a short chapter fills the viewport buffer without a scroll event', async () => {
   const ui = stitching([120, 1800, 1800]);

@@ -55,6 +55,8 @@ const renderedChapters = ref<Section[]>([]);
 const isAppending = ref(false);
 const isPrepending = ref(false);
 const isJumping = ref(false);
+/** Keep the saved anchor authoritative while following chapters extend its scroll range. */
+let restoring = false;
 /** Shared reading-line distance from the viewport top, in CSS pixels. */
 const inset = 100;
 
@@ -66,23 +68,23 @@ function locate(paragraphs: NodeListOf<HTMLElement>, position: number): number {
   return Math.max(0, paragraphs.length - 1);
 }
 
-/** Restore the captured reading line; keep the paragraph authoritative after layout changes. */
-function restoreReadingPosition(): void {
+/** Restore the reading line and report whether the current scroll range can reach it. */
+function restoreReadingPosition(): boolean {
   const el = readerViewportRef.value;
-  if (!el || !activeBook.value) return;
+  if (!el || !activeBook.value) return true;
 
   const targetParaIndex = activeBook.value.currentParagraphIndex ?? 0;
   const targetScrollRatio = activeBook.value.currentScrollRatio ?? 0;
   if (targetParaIndex === 0 && targetScrollRatio === 0) {
     el.scrollTop = 0;
-    return;
+    return true;
   }
   const block = el.querySelector<HTMLElement>(
     `.chapter-article-block[data-chapter-index="${activeBook.value.currentChapterIndex}"]`
   );
   if (!block) {
     el.scrollTop = 0;
-    return;
+    return true;
   }
   const bounds = block.getBoundingClientRect();
   const paragraphs = block.querySelectorAll<HTMLElement>(".reader-para");
@@ -93,7 +95,9 @@ function restoreReadingPosition(): void {
     // Stay inside the target even when the previous paragraph ends exactly at its top.
     position = paragraph.top + Math.min(1, paragraph.height / 2);
   }
-  el.scrollTop = Math.max(0, el.scrollTop + position - (el.getBoundingClientRect().top + inset));
+  const offset = Math.max(0, el.scrollTop + position - (el.getBoundingClientRect().top + inset));
+  el.scrollTop = offset;
+  return el.scrollTop >= offset - 0.5;
 }
 
 function initRenderedChapters(): void {
@@ -103,16 +107,17 @@ function initRenderedChapters(): void {
   isJumping.value = false;
   isAppending.value = false;
   isPrepending.value = false;
+  restoring = false;
   if (!activeBook.value || !activeBook.value.sections || activeBook.value.sections.length === 0) {
     renderedChapters.value = [];
     return;
   }
   const curIdx = activeBook.value.currentChapterIndex ?? 0;
   const initialSec = activeBook.value.sections[curIdx] || activeBook.value.sections[0];
+  restoring = true;
   renderedChapters.value = [initialSec];
   nextTick(() => {
     if (disposed || generation !== token) return;
-    restoreReadingPosition();
     if (typeof ResizeObserver !== "undefined") {
       observer ??= new ResizeObserver(resize);
       observer.disconnect();
@@ -169,6 +174,7 @@ async function onSelectChapter(index: number): Promise<void> {
   jumping = null;
   isAppending.value = false;
   isPrepending.value = false;
+  restoring = false;
   isJumping.value = true;
   try { await setBookChapter(book.id, index); }
   catch { if (generation === token) isJumping.value = false; return; }
@@ -215,6 +221,16 @@ async function handleNextChapter(): Promise<void> {
 function fill(): void {
   const viewport = readerViewportRef.value;
   if (disposed || !viewport || viewport.clientHeight <= 0 || isAppending.value || isPrepending.value) return;
+  if (restoring) {
+    const reached = restoreReadingPosition();
+    const last = renderedChapters.value.at(-1);
+    const sections = activeBook.value?.sections;
+    if (!reached && last && sections && last.index + 1 < sections.length) {
+      appendNextChapter();
+      return;
+    }
+    restoring = false;
+  }
   if (viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 700) appendNextChapter();
 }
 
@@ -299,7 +315,7 @@ function trim(): void {
 
 function updateReadingPositionFromScroll(): void {
   const el = readerViewportRef.value;
-  if (!el || !activeBook.value?.sections || isJumping.value) return;
+  if (disposed || restoring || !el || !activeBook.value?.sections || isJumping.value) return;
 
   const chapterBlocks = el.querySelectorAll<HTMLElement>(".chapter-article-block");
   if (!chapterBlocks || chapterBlocks.length === 0) return;
@@ -336,7 +352,7 @@ function updateReadingPositionFromScroll(): void {
 }
 
 function handleViewportScroll(): void {
-  if (disposed || isJumping.value || isAppending.value || isPrepending.value) return;
+  if (disposed || restoring || isJumping.value || isAppending.value || isPrepending.value) return;
   const el = readerViewportRef.value;
   if (!el || !activeBook.value?.sections) return;
 
